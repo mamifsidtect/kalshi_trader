@@ -37,7 +37,6 @@ class MarketSnapshot:
             "volume": self.volume, "open_interest": self.open_interest,
             "category": self.category, "title": self.title,
             "close_time": self.close_time, "settled": self.settled,
-            "mid_price": self.mid_price, "spread": self.spread,
         }
 
 

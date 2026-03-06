@@ -47,13 +47,21 @@ class MarketCollector:
         return snapshots
 
     def _persist(self, snapshots: List[MarketSnapshot]):
+        import tempfile
         date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         for snap in snapshots:
             dir_path = os.path.join(self.config.data_dir, date_str, snap.ticker)
             os.makedirs(dir_path, exist_ok=True)
-            path = os.path.join(dir_path, f"{snap.timestamp}.json")
-            with open(path, "w") as f:
-                json.dump(snap.to_dict(), f)
+            filename = f"{time.time_ns()}.json"
+            final_path = os.path.join(dir_path, filename)
+            data = json.dumps(snap.to_dict())
+            # Atomic write: write to temp file in same directory, then rename
+            fd, tmp_path = tempfile.mkstemp(dir=dir_path, suffix=".tmp")
+            try:
+                os.write(fd, data.encode())
+            finally:
+                os.close(fd)
+            os.replace(tmp_path, final_path)
 
     def load_snapshots(self, ticker: str, date_str: str) -> List[MarketSnapshot]:
         dir_path = os.path.join(self.config.data_dir, date_str, ticker)
