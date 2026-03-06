@@ -1,0 +1,77 @@
+from fastapi import APIRouter, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
+from typing import Optional
+import os, time
+
+router = APIRouter()
+_templates_dir = os.path.join(os.path.dirname(__file__), "..", "templates")
+templates = Jinja2Templates(directory=_templates_dir)
+
+
+class BacktestRequest(BaseModel):
+    strategy: str
+    days: int = 7
+    min_spread: Optional[int] = 3
+    confidence_threshold: Optional[float] = 0.6
+
+
+@router.get("/research/signals", response_class=HTMLResponse)
+async def signal_explorer(request: Request):
+    return templates.TemplateResponse(request, "research_signals.html")
+
+
+@router.get("/research/backtest", response_class=HTMLResponse)
+async def backtest_page(request: Request):
+    return templates.TemplateResponse(request, "research_backtest.html")
+
+
+@router.post("/api/v1/research/backtest")
+async def run_backtest(req: BacktestRequest, request: Request):
+    from kalshi_trader.strategies.market_maker import MarketMakerStrategy
+    from kalshi_trader.strategies.directional import DirectionalStrategy
+    from kalshi_trader.research.backtester import Backtester
+    from kalshi_trader.data.models import ExternalSignals
+
+    cfg = request.app.state.config
+    strategy_map = {
+        "MarketMaker": MarketMakerStrategy(min_spread=req.min_spread or 3),
+        "Directional": DirectionalStrategy(confidence_threshold=req.confidence_threshold or 0.6),
+    }
+    strategy = strategy_map.get(req.strategy)
+    if not strategy:
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"error": f"Unknown strategy: {req.strategy}"}, status_code=422)
+
+    data_service = request.app.state.data_service
+    snapshots = data_service.get_recent_snapshots(days=req.days)
+    if not snapshots:
+        return {"error": "no_data", "message": "No snapshots found. Run data collection first."}
+
+    blank_signals = ExternalSignals(timestamp=int(time.time()))
+    bt = Backtester(cfg)
+    result = bt.run(strategy, snapshots, lambda ts: blank_signals)
+    return {
+        "strategy": result.strategy_name,
+        "total_trades": result.total_trades,
+        "win_rate": result.win_rate,
+        "total_pnl": result.total_pnl,
+        "sharpe": result.sharpe,
+        "max_drawdown": result.max_drawdown,
+        "meets_promotion_gate": result.meets_promotion_gate(cfg),
+        "trade_log": result.trade_log[:50],
+    }
+
+
+@router.get("/api/v1/research/signals")
+async def signal_accuracy(request: Request, type: str = "price_momentum"):
+    from kalshi_trader.research.signal_tester import SignalTester
+    cfg = request.app.state.config
+    tester = SignalTester(cfg)
+    snapshots = request.app.state.data_service.get_recent_snapshots(days=7)
+    if type == "price_momentum":
+        return {"type": type, "accuracy": tester.test_price_momentum(snapshots), "n": len(snapshots)}
+    elif type == "spread_liquidity":
+        return {"type": type, **tester.test_spread_liquidity(snapshots)}
+    return {"error": "unknown type"}
