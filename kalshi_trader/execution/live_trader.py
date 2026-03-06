@@ -31,12 +31,15 @@ class LiveTrader:
     def close_position(self, ticker: str) -> bool:
         try:
             positions = self.client.get_positions()
-            for pos in positions:
-                if pos["ticker"] == ticker:
-                    self.client.place_order(
-                        ticker=ticker, side=pos["side"],
-                        price=99, count=pos["quantity"],
-                    )
+            matched = [p for p in positions if p["ticker"] == ticker]
+            if not matched:
+                self.logger.warning(f"[LIVE] No open position found for {ticker}")
+                return False
+            for pos in matched:
+                self.client.place_order(
+                    ticker=ticker, side=pos["side"],
+                    price=99, count=pos["quantity"],
+                )
             return True
         except Exception as e:
             self.logger.error(f"[LIVE] Failed to close {ticker}: {e}")

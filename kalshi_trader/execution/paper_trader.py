@@ -1,4 +1,4 @@
-import json, os, time
+import json, os, time, uuid
 from typing import List, Dict, Any, Optional
 from kalshi_trader.data.models import Signal
 from kalshi_trader.config import KalshiConfig
@@ -19,7 +19,7 @@ class PaperTrader:
     def execute(self, signal: Signal, current_price: int) -> Dict[str, Any]:
         cost = signal.size * (current_price / 100.0)
         order = {
-            "order_id": f"paper-{int(time.time()*1000)}",
+            "order_id": f"paper-{int(time.time()*1000)}-{uuid.uuid4().hex[:6]}",
             "ticker": signal.ticker,
             "direction": signal.direction,
             "size": signal.size,
@@ -48,7 +48,10 @@ class PaperTrader:
         if pos["direction"] == "no":
             pnl = -pnl
         self.realized_pnl += pnl
-        self.bankroll += pos["size"] * (exit_price / 100.0)
+        if pos["direction"] == "yes":
+            self.bankroll += pos["size"] * (exit_price / 100.0)
+        else:
+            self.bankroll += pos["size"] * ((100 - exit_price) / 100.0)
         close_record = {**pos, "exit_price": exit_price, "pnl": pnl, "status": "closed"}
         self._order_log.append(close_record)
         self._persist_log()
@@ -62,5 +65,11 @@ class PaperTrader:
         return self._order_log
 
     def _persist_log(self):
-        with open(self._log_path, "w") as f:
-            json.dump(self._order_log, f, indent=2)
+        import tempfile
+        data = json.dumps(self._order_log, indent=2).encode()
+        fd, tmp_path = tempfile.mkstemp(dir=self.config.data_dir, suffix=".tmp")
+        try:
+            os.write(fd, data)
+        finally:
+            os.close(fd)
+        os.replace(tmp_path, self._log_path)
