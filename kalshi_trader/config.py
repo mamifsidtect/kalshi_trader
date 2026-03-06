@@ -1,6 +1,5 @@
 import os
-from dataclasses import dataclass, field
-from typing import List
+from dataclasses import dataclass
 
 
 @dataclass
@@ -35,6 +34,14 @@ class KalshiConfig:
     log_level: str = "INFO"
     log_file: str = "kalshi_trader.log"
 
+    def __repr__(self) -> str:
+        key_preview = self.kalshi_api_key[:4] + "..." if self.kalshi_api_key else "(not set)"
+        return (
+            f"KalshiConfig(environment={self.kalshi_environment!r}, "
+            f"execution_mode={self.execution_mode!r}, "
+            f"kalshi_api_key={key_preview!r}, ...)"
+        )
+
 
 def load_config() -> KalshiConfig:
     cfg = KalshiConfig()
@@ -48,4 +55,10 @@ def load_config() -> KalshiConfig:
         cfg.execution_mode = os.getenv("EXECUTION_MODE")
     if os.getenv("LOG_LEVEL"):
         cfg.log_level = os.getenv("LOG_LEVEL")
+    VALID_EXECUTION_MODES = {"paper", "live"}
+    VALID_ENVIRONMENTS = {"demo", "prod"}
+    if cfg.execution_mode not in VALID_EXECUTION_MODES:
+        raise ValueError(f"EXECUTION_MODE must be one of {VALID_EXECUTION_MODES}, got: {cfg.execution_mode!r}")
+    if cfg.kalshi_environment not in VALID_ENVIRONMENTS:
+        raise ValueError(f"KALSHI_ENVIRONMENT must be one of {VALID_ENVIRONMENTS}, got: {cfg.kalshi_environment!r}")
     return cfg

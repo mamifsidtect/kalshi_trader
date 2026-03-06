@@ -1,4 +1,29 @@
 from kalshi_trader.config import KalshiConfig, load_config
+from kalshi_trader.utils.logger import get_logger
+import logging
+
+def test_get_logger_returns_logger():
+    logger = get_logger("test.logger")
+    assert isinstance(logger, logging.Logger)
+
+def test_get_logger_no_duplicate_handlers():
+    logger1 = get_logger("test.dedup")
+    handler_count = len(logger1.handlers)
+    logger2 = get_logger("test.dedup")
+    assert len(logger2.handlers) == handler_count
+
+def test_load_config_defaults_when_no_env(monkeypatch):
+    monkeypatch.delenv("KALSHI_API_KEY", raising=False)
+    monkeypatch.delenv("EXECUTION_MODE", raising=False)
+    cfg = load_config()
+    assert cfg.execution_mode == "paper"
+    assert cfg.kalshi_api_key == ""
+
+def test_load_config_invalid_execution_mode(monkeypatch):
+    monkeypatch.setenv("EXECUTION_MODE", "invalid")
+    import pytest
+    with pytest.raises(ValueError, match="EXECUTION_MODE"):
+        load_config()
 
 def test_default_config():
     cfg = KalshiConfig()
