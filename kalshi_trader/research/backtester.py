@@ -1,6 +1,6 @@
 import math
 from dataclasses import dataclass, field
-from typing import List, Callable, Dict
+from typing import List, Callable, Dict, Optional
 from kalshi_trader.data.models import MarketSnapshot, ExternalSignals
 from kalshi_trader.strategies.base_strategy import BaseStrategy
 from kalshi_trader.config import KalshiConfig
@@ -34,7 +34,7 @@ class Backtester:
         strategy: BaseStrategy,
         snapshots: List[MarketSnapshot],
         signals_fn: Callable[[int], ExternalSignals],
-        slippage: int = None,
+        slippage: Optional[int] = None,
     ) -> BacktestResult:
         slippage = slippage if slippage is not None else self.SLIPPAGE_CENTS
         open_position = None
@@ -93,7 +93,8 @@ class Backtester:
         # Sharpe ratio (annualized assuming ~252 trading days)
         if len(pnl_series) > 1:
             mean = sum(pnl_series) / len(pnl_series)
-            variance = sum((x - mean) ** 2 for x in pnl_series) / len(pnl_series)
+            n = len(pnl_series)
+            variance = sum((x - mean) ** 2 for x in pnl_series) / (n - 1) if n > 1 else 0.0001
             std = math.sqrt(variance) if variance > 0 else 0.0001
             sharpe = (mean / std) * math.sqrt(252)
         else:

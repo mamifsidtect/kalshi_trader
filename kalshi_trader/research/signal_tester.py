@@ -12,22 +12,18 @@ class SignalTester:
     def test_price_momentum(self, snapshots: List[MarketSnapshot]) -> float:
         """
         Test whether mid_price > 50 predicts YES settlement.
-        Returns accuracy (fraction correct) over settled snapshots.
+        Returns accuracy (fraction correct) over settled snapshots with a mid_price.
         """
         if not snapshots:
             return 0.0
-        settled = [s for s in snapshots if s.settled is not None]
+        settled = [s for s in snapshots if s.settled is not None and s.mid_price is not None]
         if not settled:
             return 0.0
 
-        correct = 0
-        for snap in settled:
-            if snap.mid_price is None:
-                continue
-            predicted_yes = snap.mid_price > 50
-            actual_yes = snap.settled
-            if predicted_yes == actual_yes:
-                correct += 1
+        correct = sum(
+            1 for snap in settled
+            if (snap.mid_price > 50) == snap.settled
+        )
         return correct / len(settled)
 
     def test_spread_liquidity(self, snapshots: List[MarketSnapshot]) -> Dict:
