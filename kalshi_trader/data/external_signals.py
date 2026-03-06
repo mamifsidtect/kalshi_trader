@@ -69,9 +69,19 @@ class ExternalSignalCollector:
         }, timeout=10)
         resp.raise_for_status()
         articles = resp.json().get("articles", [])
-        return [{"headline": a["title"], "source": a["source"]["name"],
-                 "published_at": a["publishedAt"]} for a in articles]
+        results = []
+        for a in articles:
+            try:
+                results.append({
+                    "headline": a.get("title") or "",
+                    "source": (a.get("source") or {}).get("name", ""),
+                    "published_at": a.get("publishedAt", ""),
+                })
+            except Exception:
+                continue
+        return results
 
+    # Metaculus public API requires no key — no guard needed here
     def _fetch_polls(self) -> List[Dict]:
         url = f"{self.METACULUS_BASE}/questions/"
         resp = requests.get(url, params={
