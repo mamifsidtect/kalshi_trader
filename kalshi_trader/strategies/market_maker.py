@@ -17,8 +17,12 @@ class MarketMakerStrategy(BaseStrategy):
             return None
         if market.volume < self.min_volume:
             return None
-        # Quote the cheaper side (more room to profit)
-        direction = "yes" if market.yes_bid < market.no_bid else "no"
+        # When yes_bid < no_bid, YES side is cheaper — quote it to capture the spread.
+        # When equal or no_bid < yes_bid, default to quoting NO side.
+        if market.yes_bid is not None and market.no_bid is not None and market.yes_bid < market.no_bid:
+            direction = "yes"
+        else:
+            direction = "no"
         return Signal(
             ticker=market.ticker,
             direction=direction,

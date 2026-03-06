@@ -45,14 +45,14 @@ class DirectionalStrategy(BaseStrategy):
             score += 0.15
             sources.append("polls")
 
-        if market.mid_price and market.mid_price > 60:
+        direction = "yes"  # default direction when price gives no signal
+        if market.mid_price is not None and market.mid_price > 60:
             score += 0.2
             direction = "yes"
-        elif market.mid_price and market.mid_price < 40:
+        elif market.mid_price is not None and market.mid_price < 40:
             score += 0.2
             direction = "no"
-        else:
-            direction = "yes"
+        # mid_price in [40, 60] or None: no price signal, direction stays "yes"
 
         confidence = max(0.0, min(score, 1.0))
         return confidence, direction, f"sources={sources}"
