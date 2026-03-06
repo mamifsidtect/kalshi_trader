@@ -71,6 +71,8 @@ class KalshiClient:
         return [{"ts": h.ts, "yes_price": h.yes_price} for h in (resp.history or [])]
 
     def place_order(self, ticker: str, side: str, price: int, count: int) -> Dict:
+        if self._api is None:
+            raise RuntimeError("Kalshi API not available — install kalshi-python and set credentials")
         from kalshi_python.models import CreateOrderRequest
         req = CreateOrderRequest(
             ticker=ticker, action="buy",
@@ -94,6 +96,7 @@ class KalshiClient:
         ]
 
     def _market_to_dict(self, m) -> Dict:
+        _ct = getattr(m, "close_time", None)
         return {
             "ticker": m.ticker,
             "title": getattr(m, "title", ""),
@@ -103,5 +106,5 @@ class KalshiClient:
             "volume": getattr(m, "volume", 0),
             "open_interest": getattr(m, "open_interest", 0),
             "status": getattr(m, "status", ""),
-            "close_time": str(getattr(m, "close_time", "")),
+            "close_time": _ct.isoformat() if hasattr(_ct, "isoformat") else str(_ct) if _ct else "",
         }
