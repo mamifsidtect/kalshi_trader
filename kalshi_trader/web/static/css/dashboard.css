@@ -1,0 +1,29 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, sans-serif; background: #0f1117; color: #e0e0e0; }
+nav { display: flex; gap: 1.5rem; padding: 1rem 2rem; background: #1a1d27; border-bottom: 1px solid #2d3148; }
+nav a { color: #8b9cf4; text-decoration: none; font-weight: 500; }
+nav a:hover { color: #fff; }
+main { padding: 2rem; max-width: 1200px; margin: 0 auto; }
+h1 { font-size: 1.6rem; margin-bottom: 1.5rem; color: #fff; }
+h2 { font-size: 1.2rem; margin: 1.5rem 0 0.75rem; color: #c0c4d8; }
+.cards { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 2rem; }
+.card { background: #1a1d27; border: 1px solid #2d3148; border-radius: 8px; padding: 1.25rem 1.75rem; min-width: 140px; }
+.card .label { display: block; font-size: 0.75rem; color: #8b8ea0; text-transform: uppercase; letter-spacing: 0.05em; }
+.card .value { display: block; font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem; }
+.green { color: #4ade80; }
+.red { color: #f87171; }
+.yes { color: #4ade80; }
+.no { color: #f87171; }
+.mode-badge { font-size: 0.9rem; background: #2d3148; padding: 0.2rem 0.6rem; border-radius: 4px; }
+table { width: 100%; border-collapse: collapse; background: #1a1d27; border-radius: 8px; overflow: hidden; }
+th, td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid #2d3148; }
+th { font-size: 0.75rem; color: #8b8ea0; text-transform: uppercase; }
+.signal-row { padding: 0.5rem 0; border-bottom: 1px solid #2d3148; font-size: 0.9rem; }
+.reason { color: #6b7280; font-size: 0.8rem; margin-left: 0.5rem; }
+form { display: flex; gap: 1rem; align-items: flex-end; margin-bottom: 1.5rem; flex-wrap: wrap; }
+label { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.85rem; color: #8b8ea0; }
+input, select { background: #1a1d27; border: 1px solid #2d3148; color: #e0e0e0; padding: 0.4rem 0.75rem; border-radius: 4px; }
+button { background: #4f6ef7; color: #fff; border: none; padding: 0.5rem 1.25rem; border-radius: 4px; cursor: pointer; font-weight: 600; }
+button:hover { background: #3b5bdb; }
+canvas { margin-top: 1.5rem; background: #1a1d27; border-radius: 8px; padding: 1rem; }
+pre { background: #1a1d27; padding: 1rem; border-radius: 8px; overflow-x: auto; font-size: 0.85rem; }

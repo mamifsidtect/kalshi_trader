@@ -1,1 +1,51 @@
-<html><body>dashboard</body></html>
+{% extends "base.html" %}
+{% block title %}Dashboard — Kalshi Trader{% endblock %}
+{% block content %}
+<h1>Dashboard</h1>
+<div class="cards">
+  <div class="card">
+    <span class="label">Total P&L</span>
+    <span class="value {% if summary.total_pnl >= 0 %}green{% else %}red{% endif %}">
+      ${{ "%.2f"|format(summary.total_pnl) }}
+    </span>
+  </div>
+  <div class="card">
+    <span class="label">Win Rate</span>
+    <span class="value">{{ "%.1f"|format(summary.win_rate * 100) }}%</span>
+  </div>
+  <div class="card">
+    <span class="label">Open Positions</span>
+    <span class="value">{{ summary.open_positions }}</span>
+  </div>
+  <div class="card">
+    <span class="label">Total Trades</span>
+    <span class="value">{{ summary.total_trades }}</span>
+  </div>
+  <div class="card">
+    <span class="label">Mode</span>
+    <span class="value mode-badge">{{ summary.execution_mode|upper }}</span>
+  </div>
+</div>
+<section>
+  <h2>Live Signal Feed</h2>
+  <div id="signal-feed"></div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadSignals() {
+  const resp = await fetch('/api/v1/signals');
+  const signals = await resp.json();
+  const feed = document.getElementById('signal-feed');
+  if (!signals.length) { feed.innerHTML = '<p>No signals yet.</p>'; return; }
+  feed.innerHTML = signals.map(s =>
+    `<div class="signal-row">
+      <b>${s.ticker}</b> ${s.direction.toUpperCase()} @ conf=${(s.confidence*100).toFixed(0)}%
+      <span class="reason">${s.reason}</span>
+    </div>`
+  ).join('');
+}
+loadSignals();
+setInterval(loadSignals, 5000);
+</script>
+{% endblock %}

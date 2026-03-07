@@ -1,1 +1,23 @@
-<html><body>signals</body></html>
+{% extends "base.html" %}
+{% block title %}Signal Explorer — Kalshi Trader{% endblock %}
+{% block content %}
+<h1>Signal Explorer</h1>
+<p>Select a signal source to see its historical accuracy vs. market settlement outcomes.</p>
+<div id="signal-stats">
+  <button onclick="loadStats('price_momentum')">Price Momentum</button>
+  <button onclick="loadStats('spread_liquidity')">Spread Liquidity</button>
+</div>
+<div id="signal-results"></div>
+<canvas id="signal-chart" width="800" height="300"></canvas>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/charts.js"></script>
+<script>
+async function loadStats(type) {
+  const resp = await fetch(`/api/v1/research/signals?type=${type}`);
+  const data = await resp.json();
+  document.getElementById('signal-results').innerHTML =
+    `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+}
+</script>
+{% endblock %}

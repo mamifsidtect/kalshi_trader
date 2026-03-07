@@ -1,1 +1,44 @@
-<html><body>backtest</body></html>
+{% extends "base.html" %}
+{% block title %}Backtester — Kalshi Trader{% endblock %}
+{% block content %}
+<h1>Backtester</h1>
+<form id="bt-form">
+  <label>Strategy:
+    <select name="strategy">
+      <option value="MarketMaker">Market Maker</option>
+      <option value="Directional">Directional</option>
+    </select>
+  </label>
+  <label>Days of data: <input type="number" name="days" value="7" min="1" max="90"></label>
+  <button type="submit">Run Backtest</button>
+</form>
+<div id="bt-results" style="display:none">
+  <h2>Results</h2>
+  <div class="cards" id="bt-cards"></div>
+  <canvas id="equity-chart" width="800" height="300"></canvas>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/charts.js"></script>
+<script>
+document.getElementById('bt-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const payload = { strategy: fd.get('strategy'), days: parseInt(fd.get('days')) };
+  const resp = await fetch('/api/v1/research/backtest', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload)
+  });
+  const data = await resp.json();
+  document.getElementById('bt-results').style.display = 'block';
+  document.getElementById('bt-cards').innerHTML = `
+    <div class="card"><span class="label">Trades</span><span class="value">${data.total_trades}</span></div>
+    <div class="card"><span class="label">Win Rate</span><span class="value">${(data.win_rate*100).toFixed(1)}%</span></div>
+    <div class="card"><span class="label">P&L</span><span class="value ${data.total_pnl>=0?'green':'red'}">$${data.total_pnl?.toFixed(2)}</span></div>
+    <div class="card"><span class="label">Sharpe</span><span class="value">${data.sharpe?.toFixed(2)}</span></div>
+    <div class="card"><span class="label">Gate Passed</span><span class="value">${data.meets_promotion_gate ? '✓' : '✗'}</span></div>
+  `;
+  if (data.trade_log?.length) drawEquityCurve(data.trade_log);
+});
+</script>
+{% endblock %}

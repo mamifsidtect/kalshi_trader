@@ -1,1 +1,43 @@
-<html><body>markets</body></html>
+{% extends "base.html" %}
+{% block title %}Market Browser — Kalshi Trader{% endblock %}
+{% block content %}
+<h1>Market Browser</h1>
+<div>
+  <label>Category:
+    <select id="category-filter" onchange="loadMarkets()">
+      <option value="">All</option>
+      <option value="financial">Financial</option>
+      <option value="political">Political</option>
+      <option value="sports">Sports</option>
+      <option value="weather">Weather</option>
+    </select>
+  </label>
+</div>
+<table>
+  <thead><tr><th>Ticker</th><th>Title</th><th>Category</th><th>Mid</th><th>Spread</th><th>Volume</th></tr></thead>
+  <tbody id="markets-body"></tbody>
+</table>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadMarkets() {
+  const cat = document.getElementById('category-filter').value;
+  const url = cat ? `/api/v1/markets?category=${cat}` : '/api/v1/markets';
+  const resp = await fetch(url);
+  const markets = await resp.json();
+  const tbody = document.getElementById('markets-body');
+  if (!markets.length) { tbody.innerHTML = '<tr><td colspan="6">No data collected yet.</td></tr>'; return; }
+  tbody.innerHTML = markets.map(m =>
+    `<tr>
+      <td>${m.ticker}</td>
+      <td>${m.title}</td>
+      <td>${m.category}</td>
+      <td>${m.mid_price ?? '-'}¢</td>
+      <td>${m.spread ?? '-'}</td>
+      <td>${m.volume}</td>
+    </tr>`
+  ).join('');
+}
+loadMarkets();
+</script>
+{% endblock %}

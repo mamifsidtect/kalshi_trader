@@ -1,1 +1,30 @@
-<html><body>positions</body></html>
+{% extends "base.html" %}
+{% block title %}Positions — Kalshi Trader{% endblock %}
+{% block content %}
+<h1>Open Positions</h1>
+<table id="positions-table">
+  <thead><tr><th>Ticker</th><th>Direction</th><th>Size</th><th>Entry</th><th>Strategy</th></tr></thead>
+  <tbody id="positions-body"></tbody>
+</table>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadPositions() {
+  const resp = await fetch('/api/v1/positions');
+  const positions = await resp.json();
+  const tbody = document.getElementById('positions-body');
+  if (!positions.length) { tbody.innerHTML = '<tr><td colspan="5">No open positions.</td></tr>'; return; }
+  tbody.innerHTML = positions.map(p =>
+    `<tr>
+      <td>${p.ticker}</td>
+      <td class="${p.direction}">${p.direction.toUpperCase()}</td>
+      <td>${p.size}</td>
+      <td>${p.entry_price}¢</td>
+      <td>${p.strategy}</td>
+    </tr>`
+  ).join('');
+}
+loadPositions();
+setInterval(loadPositions, 5000);
+</script>
+{% endblock %}
