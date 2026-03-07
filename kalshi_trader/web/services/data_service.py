@@ -21,8 +21,11 @@ class DataService:
         path = os.path.join(self.config.data_dir, "paper_orders.json")
         if not os.path.exists(path):
             return []
-        with open(path) as f:
-            return json.load(f)
+        try:
+            with open(path) as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return []
 
     def get_signals(self) -> List[Dict]:
         return list(self._signal_feed[-50:]) if self._signal_feed else []
