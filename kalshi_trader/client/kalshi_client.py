@@ -5,7 +5,7 @@ from kalshi_trader.config import KalshiConfig
 from kalshi_trader.utils.logger import get_logger
 
 try:
-    from kalshi_python import ApiClient, Configuration, MarketApi
+    from kalshi_python import ApiClient, Configuration, MarketsApi, PortfolioApi
     KALSHI_AVAILABLE = True
 except ImportError:
     KALSHI_AVAILABLE = False
@@ -18,12 +18,12 @@ class KalshiClient:
     def __init__(self, config: KalshiConfig):
         self.config = config
         self.logger = get_logger(__name__, config.log_level)
-        self._api = self._init_api()
+        self._api, self._portfolio_api = self._init_api()
 
     def _init_api(self):
         if not KALSHI_AVAILABLE:
             self.logger.warning("kalshi-python not installed; client will be non-functional")
-            return None
+            return None, None
         cfg = Configuration()
         cfg.host = (
             "https://demo-api.kalshi.co/trade-api/v2"
@@ -31,8 +31,19 @@ class KalshiClient:
             else "https://trading-api.kalshi.com/trade-api/v2"
         )
         client = ApiClient(cfg)
-        client.set_default_header("Authorization", f"Bearer {self.config.kalshi_api_key}")
-        return MarketApi(client)
+        key_file = self.config.kalshi_api_key_file
+        key_id = self.config.kalshi_api_key_id
+        if key_file and key_id:
+            try:
+                import os as _os
+                client.set_kalshi_auth(key_id, _os.path.expanduser(key_file))
+            except Exception as e:
+                self.logger.warning(f"Failed to load Kalshi auth key: {e}")
+                return None, None
+        else:
+            self.logger.warning("Kalshi API credentials not configured (need KALSHI_API_KEY_FILE + KALSHI_API_KEY_ID)")
+            return None, None
+        return MarketsApi(client), PortfolioApi(client)
 
     def _with_retry(self, fn, *args, **kwargs):
         delay = self.RETRY_BACKOFF
@@ -48,7 +59,16 @@ class KalshiClient:
                     delay *= 2
         raise last_exc
 
+    def _require_api(self) -> None:
+        if self._api is None:
+            raise RuntimeError("Kalshi API not available — install kalshi-python and set credentials")
+
+    def _require_portfolio_api(self) -> None:
+        if self._portfolio_api is None:
+            raise RuntimeError("Kalshi API not available — install kalshi-python and set credentials")
+
     def get_markets(self, category: Optional[str] = None, status: str = "open") -> List[Dict]:
+        self._require_api()
         resp = self._with_retry(self._api.get_markets, status=status)
         markets = resp.markets or []
         if category:
@@ -56,6 +76,7 @@ class KalshiClient:
         return [self._market_to_dict(m) for m in markets]
 
     def get_orderbook(self, ticker: str) -> Dict[str, Any]:
+        self._require_api()
         resp = self._with_retry(self._api.get_market_orderbook, ticker)
         ob = resp.orderbook
         return {
@@ -64,15 +85,18 @@ class KalshiClient:
         }
 
     def get_market_history(self, ticker: str, start_ts: int, end_ts: int) -> List[Dict]:
+        self._require_api()
         resp = self._with_retry(
-            self._api.get_market_history, ticker,
-            min_ts=start_ts, max_ts=end_ts
+            self._api.get_market_candlesticks, ticker, ticker,
+            start_ts=start_ts, end_ts=end_ts
         )
-        return [{"ts": h.ts, "yes_price": h.yes_price} for h in (resp.history or [])]
+        return [
+            {"ts": c.start_ts, "yes_price": c.close}
+            for c in (resp.candlesticks or [])
+        ]
 
     def place_order(self, ticker: str, side: str, price: int, count: int) -> Dict:
-        if self._api is None:
-            raise RuntimeError("Kalshi API not available — install kalshi-python and set credentials")
+        self._require_portfolio_api()
         from kalshi_python.models import CreateOrderRequest
         req = CreateOrderRequest(
             ticker=ticker, action="buy",
@@ -80,20 +104,27 @@ class KalshiClient:
             yes_price=price if side == "yes" else 100 - price,
             count=count,
         )
-        resp = self._with_retry(self._api.create_order, req)
+        resp = self._with_retry(self._portfolio_api.create_order, create_order_request=req)
         return {"order_id": resp.order.order_id, "status": resp.order.status}
 
     def cancel_order(self, order_id: str) -> bool:
-        self._with_retry(self._api.cancel_order, order_id)
+        self._require_portfolio_api()
+        self._with_retry(self._portfolio_api.cancel_order, order_id)
         return True
 
     def get_positions(self) -> List[Dict]:
-        resp = self._with_retry(self._api.get_positions)
-        return [
-            {"ticker": p.ticker, "side": p.side, "quantity": p.quantity,
-             "avg_price": p.average_price}
-            for p in (resp.market_positions or [])
-        ]
+        self._require_portfolio_api()
+        resp = self._with_retry(self._portfolio_api.get_positions)
+        positions = []
+        for p in (resp.positions or []):
+            net = p.position or 0
+            positions.append({
+                "ticker": p.ticker,
+                "side": "yes" if net >= 0 else "no",
+                "quantity": abs(net),
+                "avg_price": None,
+            })
+        return positions
 
     def _market_to_dict(self, m) -> Dict:
         _ct = getattr(m, "close_time", None)

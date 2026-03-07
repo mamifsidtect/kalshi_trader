@@ -9,3 +9,5 @@ optimizer_data/
 *.log
 .DS_Store
 *.tmp
+key/
+key/*

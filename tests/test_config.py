@@ -14,12 +14,14 @@ def test_get_logger_no_duplicate_handlers():
 
 def test_load_config_defaults_when_no_env(monkeypatch):
     monkeypatch.delenv("KALSHI_API_KEY", raising=False)
+    monkeypatch.delenv("KALSHI_API_KEY_FILE", raising=False)
     monkeypatch.delenv("EXECUTION_MODE", raising=False)
     cfg = load_config()
     assert cfg.execution_mode == "paper"
     assert cfg.kalshi_api_key == ""
 
 def test_load_config_invalid_execution_mode(monkeypatch):
+    monkeypatch.delenv("KALSHI_API_KEY_FILE", raising=False)
     monkeypatch.setenv("EXECUTION_MODE", "invalid")
     import pytest
     with pytest.raises(ValueError, match="EXECUTION_MODE"):

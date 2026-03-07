@@ -35,7 +35,7 @@ def test_get_orderbook_returns_dict():
 def test_place_order_raises_when_api_unavailable():
     import pytest
     client = make_client()
-    client._api = None
+    client._portfolio_api = None
     with pytest.raises(RuntimeError, match="not available"):
         client.place_order("TEST-1", "yes", 45, 1)
 

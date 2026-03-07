@@ -17,6 +17,7 @@ class ExternalSignalCollector:
         self.logger = get_logger(__name__, config.log_level)
         self.fred_api_key = os.getenv("FRED_API_KEY", "")
         self.news_api_key = os.getenv("NEWS_API_KEY", "")
+        self.metaculus_api_key = os.getenv("METACULUS_API_KEY", "")
         os.makedirs(config.data_dir, exist_ok=True)
         self._cache_path = os.path.join(config.data_dir, "external_signals_cache.json")
 
@@ -81,12 +82,13 @@ class ExternalSignalCollector:
                 continue
         return results
 
-    # Metaculus public API requires no key — no guard needed here
     def _fetch_polls(self) -> List[Dict]:
+        if not self.metaculus_api_key:
+            return []
         url = f"{self.METACULUS_BASE}/questions/"
         resp = requests.get(url, params={
             "status": "open", "order_by": "-activity", "limit": 20,
-        }, timeout=10)
+        }, headers={"Authorization": f"Token {self.metaculus_api_key}"}, timeout=10)
         resp.raise_for_status()
         results = resp.json().get("results", [])
         return [{"id": q["id"], "title": q["title"],

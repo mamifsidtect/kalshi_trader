@@ -16,7 +16,7 @@ from kalshi_trader.utils.logger import get_logger
 
 def main():
     cfg = load_config()
-    logger = get_logger("collect_data", cfg.log_level, cfg.log_file)
+    logger = get_logger("collect_data", cfg.log_level)
     client = KalshiClient(cfg)
     market_collector = MarketCollector(client, cfg)
     signal_collector = ExternalSignalCollector(cfg)

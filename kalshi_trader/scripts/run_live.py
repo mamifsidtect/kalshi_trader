@@ -66,7 +66,7 @@ def trading_loop(cfg, client, risk_manager, executor, logger):
 
 def main():
     cfg = load_config()
-    logger = get_logger("run_live", cfg.log_level, cfg.log_file)
+    logger = get_logger("run_live", cfg.log_level)
     client = KalshiClient(cfg)
 
     # Placeholder bankroll — replace with actual account balance query
