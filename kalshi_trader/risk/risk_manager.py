@@ -9,8 +9,8 @@ from kalshi_trader.utils.logger import get_logger
 class PositionMeta:
     exposure: float
     category: str = ""
-    entry_price: int = 0
-    entry_ts: int = 0
+    entry_price: Optional[int] = None
+    entry_ts: Optional[int] = None
     direction: str = "yes"
     strategy_name: str = ""
 
@@ -65,8 +65,8 @@ class RiskManager:
         ticker: str,
         exposure: float,
         category: str = "",
-        entry_price: int = 0,
-        entry_ts: int = 0,
+        entry_price: Optional[int] = None,
+        entry_ts: Optional[int] = None,
         direction: str = "yes",
         strategy_name: str = "",
     ):

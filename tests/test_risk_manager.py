@@ -71,7 +71,6 @@ def test_different_category_not_blocked():
 
 
 def test_position_meta_stored_and_retrievable():
-    import time
     cfg = KalshiConfig()
     rm = RiskManager(cfg, bankroll=1000.0)
     rm.record_open_position(
