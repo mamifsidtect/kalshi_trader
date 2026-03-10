@@ -42,6 +42,13 @@ class KalshiConfig:
     log_level: str = "INFO"
     log_file: str = "kalshi_trader.log"
 
+    # Exit conditions
+    exit_profit_cents: int = 0    # 0 = disabled; close position when profit >= N cents
+    exit_time_hours: int = 0      # 0 = disabled; close position after N hours
+
+    # Polymarket integration
+    ticker_mappings_file: str = ""  # path to JSON: {kalshi_ticker: polymarket_condition_id}
+
     def __repr__(self) -> str:
         key_preview = self.kalshi_api_key[:4] + "..." if self.kalshi_api_key else "(not set)"
         return (
@@ -65,6 +72,12 @@ def load_config() -> KalshiConfig:
         cfg.execution_mode = os.getenv("EXECUTION_MODE")
     if os.getenv("LOG_LEVEL"):
         cfg.log_level = os.getenv("LOG_LEVEL")
+    if os.getenv("EXIT_PROFIT_CENTS"):
+        cfg.exit_profit_cents = int(os.getenv("EXIT_PROFIT_CENTS"))
+    if os.getenv("EXIT_TIME_HOURS"):
+        cfg.exit_time_hours = int(os.getenv("EXIT_TIME_HOURS"))
+    if os.getenv("TICKER_MAPPINGS_FILE"):
+        cfg.ticker_mappings_file = os.getenv("TICKER_MAPPINGS_FILE")
 
     VALID_EXECUTION_MODES = {"paper", "live"}
     VALID_ENVIRONMENTS = {"demo", "prod"}
