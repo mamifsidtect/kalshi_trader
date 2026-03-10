@@ -30,6 +30,21 @@ def test_market_collector_saves_snapshot(tmp_path):
     assert snapshots[0].ticker == "TEST-1"
 
 
+def test_market_collector_derives_no_bid_no_ask(tmp_path):
+    """_market_to_dict must populate no_bid and no_ask from YES prices."""
+    cfg = KalshiConfig(data_dir=str(tmp_path))
+    mock_client = MagicMock()
+    mock_client.get_markets.return_value = [{
+        "ticker": "TEST-2", "yes_bid": 40, "yes_ask": 45,
+        "volume": 100, "open_interest": 50,
+        "category": "financial", "title": "T", "close_time": "",
+    }]
+    collector = MarketCollector(mock_client, cfg)
+    snapshots = collector.collect_once()
+    assert snapshots[0].no_bid == 55   # 100 - yes_ask(45)
+    assert snapshots[0].no_ask == 60   # 100 - yes_bid(40)
+
+
 def test_collector_persists_to_disk(tmp_path):
     cfg = KalshiConfig(data_dir=str(tmp_path))
     mock_client = MagicMock()

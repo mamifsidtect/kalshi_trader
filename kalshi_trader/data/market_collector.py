@@ -25,13 +25,17 @@ class MarketCollector:
         ts = int(time.time())
         for m in markets:
             try:
+                yes_bid = m.get("yes_bid")
+                yes_ask = m.get("yes_ask")
+                no_bid = m.get("no_bid") or (100 - yes_ask if yes_ask is not None else None)
+                no_ask = m.get("no_ask") or (100 - yes_bid if yes_bid is not None else None)
                 snap = MarketSnapshot(
                     ticker=m["ticker"],
                     timestamp=ts,
-                    yes_bid=m.get("yes_bid"),
-                    yes_ask=m.get("yes_ask"),
-                    no_bid=m.get("no_bid"),
-                    no_ask=m.get("no_ask"),
+                    yes_bid=yes_bid,
+                    yes_ask=yes_ask,
+                    no_bid=no_bid,
+                    no_ask=no_ask,
                     volume=m.get("volume", 0),
                     open_interest=m.get("open_interest", 0),
                     category=m.get("category", ""),

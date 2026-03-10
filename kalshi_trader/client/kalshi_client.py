@@ -128,12 +128,18 @@ class KalshiClient:
 
     def _market_to_dict(self, m) -> Dict:
         _ct = getattr(m, "close_time", None)
+        yes_bid = getattr(m, "yes_bid", None)
+        yes_ask = getattr(m, "yes_ask", None)
+        no_bid = getattr(m, "no_bid", None) or (100 - yes_ask if yes_ask is not None else None)
+        no_ask = getattr(m, "no_ask", None) or (100 - yes_bid if yes_bid is not None else None)
         return {
             "ticker": m.ticker,
             "title": getattr(m, "title", ""),
             "category": getattr(m, "category", ""),
-            "yes_bid": getattr(m, "yes_bid", None),
-            "yes_ask": getattr(m, "yes_ask", None),
+            "yes_bid": yes_bid,
+            "yes_ask": yes_ask,
+            "no_bid": no_bid,
+            "no_ask": no_ask,
             "volume": getattr(m, "volume", 0),
             "open_interest": getattr(m, "open_interest", 0),
             "status": getattr(m, "status", ""),
