@@ -7,6 +7,7 @@ from typing import List, Dict, Optional
 from kalshi_trader.data.models import ExternalSignals
 from kalshi_trader.config import KalshiConfig
 from kalshi_trader.utils.logger import get_logger
+from kalshi_trader.data.polymarket_client import PolymarketClient
 
 
 class ExternalSignalCollector:
@@ -21,6 +22,13 @@ class ExternalSignalCollector:
         self.metaculus_api_key = os.getenv("METACULUS_API_KEY", "")
         os.makedirs(config.data_dir, exist_ok=True)
         self._cache_path = os.path.join(config.data_dir, "external_signals_cache.json")
+        self._ticker_mappings: dict = {}
+        if config.ticker_mappings_file:
+            try:
+                with open(config.ticker_mappings_file) as f:
+                    self._ticker_mappings = json.load(f)
+            except (OSError, json.JSONDecodeError):
+                pass
 
     def collect(self) -> ExternalSignals:
         ts = int(time.time())
@@ -41,11 +49,18 @@ class ExternalSignalCollector:
         except Exception as e:
             self.logger.warning(f"Polls fetch failed: {e}")
 
+        correlated = {}
+        try:
+            correlated = self._fetch_polymarket_prices()
+        except Exception as e:
+            self.logger.warning(f"Polymarket prices fetch failed: {e}")
+
         signals = ExternalSignals(
             timestamp=ts,
             economic_releases=releases,
             news_headlines=news,
             poll_data=polls,
+            correlated_prices=correlated,
         )
         self._cache(signals)
         return signals
@@ -95,6 +110,18 @@ class ExternalSignalCollector:
         return [{"id": q["id"], "title": q["title"],
                  "community_prediction": q.get("community_prediction")}
                 for q in results]
+
+    def _fetch_polymarket_prices(self) -> dict:
+        """Fetch YES probabilities for all mapped Kalshi tickers from Polymarket."""
+        if not self._ticker_mappings:
+            return {}
+        condition_ids = list(self._ticker_mappings.values())
+        raw = PolymarketClient().get_probabilities(condition_ids)
+        return {
+            kalshi_ticker: raw[condition_id]
+            for kalshi_ticker, condition_id in self._ticker_mappings.items()
+            if condition_id in raw
+        }
 
     def _cache(self, signals: ExternalSignals):
         data = json.dumps({
