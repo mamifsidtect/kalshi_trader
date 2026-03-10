@@ -96,13 +96,19 @@ class ExternalSignalCollector:
                 for q in results]
 
     def _cache(self, signals: ExternalSignals):
-        with open(self._cache_path, "w") as f:
-            json.dump({
-                "timestamp": signals.timestamp,
-                "economic_releases": signals.economic_releases,
-                "news_headlines": signals.news_headlines,
-                "poll_data": signals.poll_data,
-            }, f)
+        import tempfile
+        data = json.dumps({
+            "timestamp": signals.timestamp,
+            "economic_releases": signals.economic_releases,
+            "news_headlines": signals.news_headlines,
+            "poll_data": signals.poll_data,
+        }).encode()
+        fd, tmp_path = tempfile.mkstemp(dir=self.config.data_dir, suffix=".tmp")
+        try:
+            os.write(fd, data)
+        finally:
+            os.close(fd)
+        os.replace(tmp_path, self._cache_path)
 
     def load_cached(self) -> Optional[ExternalSignals]:
         if not os.path.exists(self._cache_path):

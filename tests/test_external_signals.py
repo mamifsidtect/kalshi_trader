@@ -23,3 +23,17 @@ def test_collector_degrades_on_failure():
                 signals = collector.collect()
     assert signals.news_headlines == [{"headline": "test"}]
     assert signals.economic_releases == []
+
+
+def test_cache_is_loadable_after_write(tmp_path):
+    """Cached signals must be readable back via load_cached."""
+    from unittest.mock import patch
+    cfg = KalshiConfig(data_dir=str(tmp_path))
+    collector = ExternalSignalCollector(cfg)
+    with patch.object(collector, "_fetch_economic_releases", return_value=[{"id": "CPI"}]):
+        with patch.object(collector, "_fetch_news", return_value=[]):
+            with patch.object(collector, "_fetch_polls", return_value=[]):
+                collector.collect()
+    loaded = collector.load_cached()
+    assert loaded is not None
+    assert loaded.economic_releases == [{"id": "CPI"}]
