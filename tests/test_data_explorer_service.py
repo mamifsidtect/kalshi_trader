@@ -188,3 +188,71 @@ def test_get_market_snapshots_skips_malformed_json(tmp_path):
     svc = DataExplorerService(cfg)
     snaps = svc.get_market_snapshots("KXTEST-1")
     assert len(snaps) == 1  # bad file skipped, good file returned
+
+
+def test_get_all_markets_date_range_single_month(tmp_path):
+    """date_range uses abbreviated month name and en-dash, no year: 'Mar 7–10'"""
+    for date in ["2026-03-07", "2026-03-10"]:
+        ts = 1741392000
+        path = str(tmp_path / date / "KXTEST-1" / f"{ts}000000000.json")
+        _write_snapshot(path, _snap(ts=ts))
+
+    cfg = KalshiConfig(data_dir=str(tmp_path))
+    svc = DataExplorerService(cfg)
+    markets = svc.get_all_markets()
+    assert markets[0]["date_range"] == "Mar 7\u201310"
+
+
+def test_get_all_markets_date_range_multi_month(tmp_path):
+    """Multi-month date_range: 'Feb 28–Mar 3'"""
+    for date in ["2026-02-28", "2026-03-03"]:
+        ts = 1741392000
+        path = str(tmp_path / date / "KXTEST-1" / f"{ts}000000000.json")
+        _write_snapshot(path, _snap(ts=ts))
+
+    cfg = KalshiConfig(data_dir=str(tmp_path))
+    svc = DataExplorerService(cfg)
+    markets = svc.get_all_markets()
+    assert markets[0]["date_range"] == "Feb 28\u2013Mar 3"
+
+
+def test_get_all_markets_includes_title(tmp_path):
+    date = "2026-03-08"
+    path = str(tmp_path / date / "KXTEST-1" / "1741392000000000000.json")
+    _write_snapshot(path, _snap(ts=1741392000, title="Bitcoin above $50k"))
+
+    cfg = KalshiConfig(data_dir=str(tmp_path))
+    svc = DataExplorerService(cfg)
+    markets = svc.get_all_markets()
+    assert markets[0]["title"] == "Bitcoin above $50k"
+
+
+def test_get_all_markets_settled_from_most_recent_snapshot(tmp_path):
+    """settled field comes from the most recent snapshot."""
+    date = "2026-03-08"
+    # older snapshot: unsettled
+    path1 = str(tmp_path / date / "KXTEST-1" / "1741392000000000000.json")
+    _write_snapshot(path1, _snap(ts=1741392000, settled=None))
+    # newer snapshot: settled YES
+    path2 = str(tmp_path / date / "KXTEST-1" / "1741392060000000000.json")
+    _write_snapshot(path2, _snap(ts=1741392060, settled=True))
+
+    cfg = KalshiConfig(data_dir=str(tmp_path))
+    svc = DataExplorerService(cfg)
+    markets = svc.get_all_markets()
+    assert markets[0]["settled"] is True
+
+
+def test_get_all_markets_multiple_tickers(tmp_path):
+    """Each distinct ticker appears as a separate entry."""
+    date = "2026-03-08"
+    for ticker in ["KXTEST-1", "KXTEST-2"]:
+        path = str(tmp_path / date / ticker / "1741392000000000000.json")
+        _write_snapshot(path, _snap(ticker=ticker, ts=1741392000))
+
+    cfg = KalshiConfig(data_dir=str(tmp_path))
+    svc = DataExplorerService(cfg)
+    markets = svc.get_all_markets()
+    assert len(markets) == 2
+    tickers = {m["ticker"] for m in markets}
+    assert tickers == {"KXTEST-1", "KXTEST-2"}

@@ -78,7 +78,7 @@ class DataExplorerService:
                             file_paths.append(snap_file.path)
 
         if not found:
-            raise HTTPException(status_code=404, detail=f"Ticker '{ticker}' not found")
+            raise HTTPException(status_code=404, detail="Ticker not found")
 
         snapshots = []
         for path in file_paths:
