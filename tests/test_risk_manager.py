@@ -47,3 +47,24 @@ def test_size_capped_by_max_position_pct():
     size = rm.size_position(current_price=45)
     assert size <= 111
     assert size > 0
+
+
+def test_signal_rejected_over_category_exposure():
+    cfg = KalshiConfig(max_category_exposure_pct=0.10)
+    rm = RiskManager(cfg, bankroll=1000.0)
+    # Record $105 exposure in "financial" category (10.5% of $1000)
+    rm.record_open_position("OTHER-1", exposure=105.0, category="financial")
+    sig = make_signal()
+    approved, reason = rm.validate(sig, current_price=45, category="financial")
+    assert not approved
+    assert "category" in reason.lower()
+
+
+def test_different_category_not_blocked():
+    cfg = KalshiConfig(max_category_exposure_pct=0.10)
+    rm = RiskManager(cfg, bankroll=1000.0)
+    rm.record_open_position("OTHER-1", exposure=105.0, category="financial")
+    sig = make_signal()
+    # Different category should not be blocked
+    approved, _ = rm.validate(sig, current_price=45, category="politics")
+    assert approved
