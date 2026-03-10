@@ -17,6 +17,11 @@ class PaperTrader:
         os.makedirs(config.data_dir, exist_ok=True)
 
     def execute(self, signal: Signal, current_price: int) -> Dict[str, Any]:
+        if signal.ticker in self._positions:
+            self.logger.warning(
+                f"[PAPER] Position already open for {signal.ticker}; skipping duplicate order"
+            )
+            return {"status": "rejected", "reason": "position already open", "ticker": signal.ticker}
         cost = signal.size * (current_price / 100.0)
         order = {
             "order_id": f"paper-{int(time.time()*1000)}-{uuid.uuid4().hex[:6]}",

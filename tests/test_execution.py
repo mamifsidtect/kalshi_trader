@@ -69,6 +69,20 @@ def test_live_trader_execute_rejected_on_error():
     assert "API error" in result["reason"]
 
 
+def test_paper_trader_does_not_overwrite_open_position(tmp_path):
+    """Executing a second signal for the same ticker should be rejected."""
+    cfg = KalshiConfig(data_dir=str(tmp_path))
+    trader = PaperTrader(cfg, initial_bankroll=1000.0)
+    sig = make_signal("DUPE-1")
+    trader.execute(sig, current_price=45)
+    result = trader.execute(sig, current_price=50)  # second call, same ticker
+    assert result.get("status") == "rejected"
+    # Position should still reflect the original entry
+    positions = trader.get_positions()
+    assert len(positions) == 1
+    assert positions[0]["entry_price"] == 45
+
+
 def test_live_trader_close_position_not_found():
     cfg = KalshiConfig()
     mock_client = MagicMock()
