@@ -1,7 +1,18 @@
+from dataclasses import dataclass
 from typing import Dict, Optional, Tuple
 from kalshi_trader.config import KalshiConfig
 from kalshi_trader.data.models import Signal
 from kalshi_trader.utils.logger import get_logger
+
+
+@dataclass
+class PositionMeta:
+    exposure: float
+    category: str = ""
+    entry_price: int = 0
+    entry_ts: int = 0
+    direction: str = "yes"
+    strategy_name: str = ""
 
 
 class RiskManager:
@@ -11,7 +22,7 @@ class RiskManager:
         self.logger = get_logger(__name__, config.log_level)
         self._daily_loss: float = 0.0
         self._halted: bool = False
-        self._open_positions: Dict[str, Tuple[float, str]] = {}  # ticker -> (exposure, category)
+        self._open_positions: Dict[str, PositionMeta] = {}
 
     def validate(self, signal: Signal, current_price: int, category: str = "") -> Tuple[bool, str]:
         if self._halted:
@@ -21,14 +32,14 @@ class RiskManager:
             self._halted = True
             return False, f"daily loss limit reached (${self._daily_loss:.2f})"
 
-        total_exposure = sum(exp for exp, _ in self._open_positions.values())
+        total_exposure = sum(m.exposure for m in self._open_positions.values())
         max_exposure = self.bankroll * self.config.max_total_exposure_pct
         if total_exposure >= max_exposure:
             return False, f"max total exposure reached (${total_exposure:.2f} >= ${max_exposure:.2f})"
 
         if category:
             cat_exposure = sum(
-                exp for exp, cat in self._open_positions.values() if cat == category
+                m.exposure for m in self._open_positions.values() if m.category == category
             )
             max_cat = self.bankroll * self.config.max_category_exposure_pct
             if cat_exposure >= max_cat:
@@ -49,8 +60,30 @@ class RiskManager:
             self._halted = True
             self.logger.warning(f"Daily loss limit reached: ${self._daily_loss:.2f}")
 
-    def record_open_position(self, ticker: str, exposure: float, category: str = ""):
-        self._open_positions[ticker] = (exposure, category)
+    def record_open_position(
+        self,
+        ticker: str,
+        exposure: float,
+        category: str = "",
+        entry_price: int = 0,
+        entry_ts: int = 0,
+        direction: str = "yes",
+        strategy_name: str = "",
+    ):
+        self._open_positions[ticker] = PositionMeta(
+            exposure=exposure,
+            category=category,
+            entry_price=entry_price,
+            entry_ts=entry_ts,
+            direction=direction,
+            strategy_name=strategy_name,
+        )
+
+    def has_position(self, ticker: str) -> bool:
+        return ticker in self._open_positions
+
+    def get_position_meta(self, ticker: str) -> Optional[PositionMeta]:
+        return self._open_positions.get(ticker)
 
     def close_position(self, ticker: str):
         self._open_positions.pop(ticker, None)

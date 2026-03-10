@@ -68,3 +68,35 @@ def test_different_category_not_blocked():
     # Different category should not be blocked
     approved, _ = rm.validate(sig, current_price=45, category="politics")
     assert approved
+
+
+def test_position_meta_stored_and_retrievable():
+    import time
+    cfg = KalshiConfig()
+    rm = RiskManager(cfg, bankroll=1000.0)
+    rm.record_open_position(
+        "TEST-1", exposure=45.0, category="financial",
+        entry_price=45, entry_ts=int(time.time()),
+        direction="yes", strategy_name="MarketMaker",
+    )
+    assert rm.has_position("TEST-1")
+    meta = rm.get_position_meta("TEST-1")
+    assert meta is not None
+    assert meta.entry_price == 45
+    assert meta.strategy_name == "MarketMaker"
+    assert meta.direction == "yes"
+
+
+def test_has_position_false_when_absent():
+    cfg = KalshiConfig()
+    rm = RiskManager(cfg, bankroll=1000.0)
+    assert not rm.has_position("NONEXISTENT")
+
+
+def test_close_position_removes_meta():
+    cfg = KalshiConfig()
+    rm = RiskManager(cfg, bankroll=1000.0)
+    rm.record_open_position("TEST-1", exposure=10.0)
+    rm.close_position("TEST-1")
+    assert not rm.has_position("TEST-1")
+    assert rm.get_position_meta("TEST-1") is None
