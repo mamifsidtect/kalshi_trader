@@ -18,8 +18,9 @@ from kalshi_trader.risk.risk_manager import RiskManager
 from kalshi_trader.execution.paper_trader import PaperTrader
 from kalshi_trader.execution.live_trader import LiveTrader
 from kalshi_trader.utils.logger import get_logger
+from collections import deque
 
-SIGNAL_FEED = []
+SIGNAL_FEED = deque(maxlen=200)
 
 
 def trading_loop(cfg, client, risk_manager, executor, logger):
@@ -49,8 +50,6 @@ def trading_loop(cfg, client, risk_manager, executor, logger):
                         "approved": approved,
                     }
                     SIGNAL_FEED.append(feed_entry)
-                    if len(SIGNAL_FEED) > 200:
-                        SIGNAL_FEED.pop(0)
 
                     if approved:
                         executor.execute(signal, current_price=entry_price)
