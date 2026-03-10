@@ -1,9 +1,11 @@
-import json, os
+import json, logging, os
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional
 from kalshi_trader.config import KalshiConfig
 from kalshi_trader.data.models import MarketSnapshot
 from kalshi_trader.data.market_collector import MarketCollector
+
+_log = logging.getLogger(__name__)
 
 
 class DataService:
@@ -28,7 +30,7 @@ class DataService:
             return []
 
     def get_signals(self) -> List[Dict]:
-        return list(self._signal_feed[-50:]) if self._signal_feed else []
+        return list(self._signal_feed)[-50:] if self._signal_feed else []
 
     def get_summary(self) -> Dict[str, Any]:
         positions = self.get_positions()
@@ -83,5 +85,6 @@ class DataService:
             if best_yes_bid is not None and yes_ask is not None:
                 return (best_yes_bid + yes_ask) / 2.0
             return None
-        except Exception:
+        except Exception as e:
+            _log.debug(f"get_live_mid_price failed for {ticker}: {e}")
             return None

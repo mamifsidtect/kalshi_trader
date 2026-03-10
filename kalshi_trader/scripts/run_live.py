@@ -8,6 +8,7 @@ Usage:
 """
 import threading
 import time
+from datetime import datetime, timezone
 from kalshi_trader.config import load_config
 from kalshi_trader.client.kalshi_client import KalshiClient
 from kalshi_trader.data.market_collector import MarketCollector
@@ -39,7 +40,6 @@ def _update_correlated_prices(arb_strategy: ArbitrageStrategy, ext_signals) -> N
 
 
 def trading_loop(cfg, client, risk_manager, executor, logger):
-    from datetime import datetime, timezone
     market_collector = MarketCollector(client, cfg)
     signal_collector = ExternalSignalCollector(cfg)
     arb_strategy = ArbitrageStrategy()

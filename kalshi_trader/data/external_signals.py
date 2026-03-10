@@ -1,6 +1,7 @@
 import time
 import os
 import json
+import tempfile
 import requests
 from typing import List, Dict, Optional
 from kalshi_trader.data.models import ExternalSignals
@@ -96,7 +97,6 @@ class ExternalSignalCollector:
                 for q in results]
 
     def _cache(self, signals: ExternalSignals):
-        import tempfile
         data = json.dumps({
             "timestamp": signals.timestamp,
             "economic_releases": signals.economic_releases,

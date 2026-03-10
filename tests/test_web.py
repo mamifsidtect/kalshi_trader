@@ -56,3 +56,17 @@ def test_data_service_get_live_mid_price():
     mid = svc.get_live_mid_price(mock_client, "TEST-1")
     # best yes bid=45, yes ask = 100 - best no bid(55) = 45 → mid = (45+45)/2 = 45.0
     assert mid == 45.0
+
+
+def test_data_service_signals_with_deque():
+    """DataService.get_signals must work when signal_feed is a deque."""
+    from collections import deque
+    from kalshi_trader.web.services.data_service import DataService
+    from kalshi_trader.config import KalshiConfig
+    cfg = KalshiConfig()
+    feed = deque(maxlen=200)
+    feed.append({"ticker": "T", "direction": "yes"})
+    svc = DataService(cfg, signal_feed=feed)
+    result = svc.get_signals()
+    assert len(result) == 1
+    assert result[0]["ticker"] == "T"
