@@ -27,7 +27,7 @@ Two new pages added to the existing FastAPI dashboard. The app moves from port 8
 | File | Change |
 |------|--------|
 | `kalshi_trader/web/app.py` | Register `data_explorer` router; instantiate `DataExplorerService` into `app.state.data_explorer_service` |
-| `kalshi_trader/config.py` | Change default `dashboard_port` from `8000` to `55055`; add `WEB_PORT` env var loading if not already present |
+| `kalshi_trader/config.py` | Change default `dashboard_port` from `8000` to `55055`; add `DASHBOARD_PORT` env var loading |
 | `kalshi_trader/web/templates/base.html` | Add `<a href="/data-explorer">Data Explorer</a>` nav link alongside existing nav items |
 
 ### Routes
@@ -133,7 +133,7 @@ Loads all JSON files for a ticker, sorted ascending by timestamp. Returns:
 
 ## Port Change
 
-`KalshiConfig.dashboard_port` default changes from `8000` → `55055`. Env var `DASHBOARD_PORT` (or existing equivalent) overrides it. Update the README to reflect the new default port.
+`KalshiConfig.dashboard_port` default changes from `8000` → `55055`. Env var `DASHBOARD_PORT` overrides it. Update the README to reflect the new default port.
 
 ---
 
