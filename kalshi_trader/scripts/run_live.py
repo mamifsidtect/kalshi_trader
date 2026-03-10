@@ -24,12 +24,20 @@ SIGNAL_FEED = deque(maxlen=200)
 
 
 def trading_loop(cfg, client, risk_manager, executor, logger):
+    from datetime import datetime, timezone
     market_collector = MarketCollector(client, cfg)
     signal_collector = ExternalSignalCollector(cfg)
     strategies = [MarketMakerStrategy(), DirectionalStrategy()]
+    last_reset_date = datetime.now(timezone.utc).date()
 
     while True:
         try:
+            # Daily reset check
+            today = datetime.now(timezone.utc).date()
+            if today > last_reset_date:
+                risk_manager.reset_daily()
+                last_reset_date = today
+
             snapshots = market_collector.collect_once()
             ext_signals = signal_collector.collect()
 
@@ -39,8 +47,15 @@ def trading_loop(cfg, client, risk_manager, executor, logger):
                     if signal is None:
                         continue
 
-                    entry_price = snap.yes_ask or 50
-                    approved, reason = risk_manager.validate(signal, current_price=entry_price)
+                    # Use correct side price
+                    if signal.direction == "yes":
+                        entry_price = snap.yes_ask or 50
+                    else:
+                        entry_price = snap.no_ask or 50
+
+                    approved, reason = risk_manager.validate(
+                        signal, current_price=entry_price, category=snap.category
+                    )
                     feed_entry = {
                         "ticker": signal.ticker,
                         "direction": signal.direction,
@@ -52,7 +67,14 @@ def trading_loop(cfg, client, risk_manager, executor, logger):
                     SIGNAL_FEED.append(feed_entry)
 
                     if approved:
-                        executor.execute(signal, current_price=entry_price)
+                        # Size position from risk manager
+                        signal.size = risk_manager.size_position(entry_price)
+                        result = executor.execute(signal, current_price=entry_price)
+                        if result.get("status") not in ("rejected",):
+                            cost = signal.size * (entry_price / 100.0)
+                            risk_manager.record_open_position(
+                                signal.ticker, cost, category=snap.category
+                            )
 
         except KeyboardInterrupt:
             logger.info("Trading loop stopped by user")
