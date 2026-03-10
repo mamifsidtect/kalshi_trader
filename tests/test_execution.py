@@ -90,3 +90,19 @@ def test_live_trader_close_position_not_found():
     trader = LiveTrader(mock_client, cfg)
     result = trader.close_position("NONEXISTENT")
     assert result is False
+
+
+def test_live_trader_close_uses_sell_action():
+    """close_position must place a SELL order, not a BUY."""
+    cfg = KalshiConfig()
+    mock_client = MagicMock()
+    mock_client.get_positions.return_value = [
+        {"ticker": "CLOSE-1", "side": "yes", "quantity": 2}
+    ]
+    mock_client.place_order.return_value = {"order_id": "x", "status": "filled"}
+    trader = LiveTrader(mock_client, cfg)
+    result = trader.close_position("CLOSE-1")
+    assert result is True
+    call_kwargs = mock_client.place_order.call_args
+    # Verify action="sell" was passed
+    assert call_kwargs.kwargs.get("action") == "sell"

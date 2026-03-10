@@ -37,8 +37,10 @@ class LiveTrader:
                 return False
             for pos in matched:
                 self.client.place_order(
-                    ticker=ticker, side=pos["side"],
-                    price=99, count=pos["quantity"],
+                    ticker=ticker,
+                    side=pos["side"],
+                    action="sell",
+                    count=pos["quantity"],
                 )
             return True
         except Exception as e:

@@ -95,13 +95,13 @@ class KalshiClient:
             for c in (resp.candlesticks or [])
         ]
 
-    def place_order(self, ticker: str, side: str, price: int, count: int) -> Dict:
+    def place_order(self, ticker: str, side: str, count: int, action: str = "buy", price: Optional[int] = None) -> Dict:
         self._require_portfolio_api()
         from kalshi_python.models import CreateOrderRequest
         req = CreateOrderRequest(
-            ticker=ticker, action="buy",
+            ticker=ticker, action=action,
             side=side, type="limit",
-            yes_price=price if side == "yes" else 100 - price,
+            yes_price=(price if side == "yes" else 100 - price) if price is not None else None,
             count=count,
         )
         resp = self._with_retry(self._portfolio_api.create_order, create_order_request=req)
