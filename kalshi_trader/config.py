@@ -35,7 +35,7 @@ class KalshiConfig:
     data_dir: str = "data"
 
     # Dashboard
-    dashboard_port: int = 8000
+    dashboard_port: int = 55055
     dashboard_enabled: bool = True
 
     # Logging
@@ -78,6 +78,8 @@ def load_config() -> KalshiConfig:
         cfg.exit_time_hours = int(os.getenv("EXIT_TIME_HOURS"))
     if os.getenv("TICKER_MAPPINGS_FILE"):
         cfg.ticker_mappings_file = os.getenv("TICKER_MAPPINGS_FILE")
+    if os.getenv("DASHBOARD_PORT"):
+        cfg.dashboard_port = int(os.getenv("DASHBOARD_PORT"))
 
     VALID_EXECUTION_MODES = {"paper", "live"}
     VALID_ENVIRONMENTS = {"demo", "prod"}

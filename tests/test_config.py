@@ -32,7 +32,7 @@ def test_default_config():
     assert cfg.execution_mode == "paper"
     assert cfg.max_position_pct == 0.05
     assert cfg.daily_loss_limit_pct == 0.03
-    assert cfg.dashboard_port == 8000
+    assert cfg.dashboard_port == 55055
 
 def test_load_config_from_env(monkeypatch):
     monkeypatch.setenv("KALSHI_API_KEY", "test-key")
