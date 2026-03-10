@@ -37,6 +37,29 @@ class Backtester:
         slippage: Optional[int] = None,
     ) -> BacktestResult:
         slippage = slippage if slippage is not None else self.SLIPPAGE_CENTS
+
+        # Group snapshots by ticker to avoid cross-ticker contamination
+        by_ticker: Dict[str, List[MarketSnapshot]] = {}
+        for snap in snapshots:
+            by_ticker.setdefault(snap.ticker, []).append(snap)
+
+        all_trades: List[Dict] = []
+        all_pnl: List[float] = []
+
+        for ticker_snaps in by_ticker.values():
+            trades, pnl = self._run_single_ticker(strategy, ticker_snaps, signals_fn, slippage)
+            all_trades.extend(trades)
+            all_pnl.extend(pnl)
+
+        return self._compute_result(strategy.name, all_trades, all_pnl)
+
+    def _run_single_ticker(
+        self,
+        strategy: BaseStrategy,
+        snapshots: List[MarketSnapshot],
+        signals_fn: Callable[[int], ExternalSignals],
+        slippage: int,
+    ) -> tuple:
         open_position = None
         trade_log = []
         pnl_series = []
@@ -46,10 +69,12 @@ class Backtester:
             signal = strategy.on_market_update(snap, signals)
 
             if open_position is None and signal is not None and snap.mid_price is not None:
-                entry_price = (
-                    snap.yes_ask + slippage if signal.direction == "yes"
-                    else snap.no_ask + slippage
-                )
+                if signal.direction == "yes" and snap.yes_ask is not None:
+                    entry_price = snap.yes_ask + slippage
+                elif signal.direction == "no" and snap.no_ask is not None:
+                    entry_price = snap.no_ask + slippage
+                else:
+                    continue
                 open_position = {
                     "ticker": snap.ticker,
                     "direction": signal.direction,
@@ -58,28 +83,26 @@ class Backtester:
                     "entry_bar": snap.timestamp,
                 }
 
-            elif open_position is not None:
-                # Hold until settled or end of data
-                if snap.settled is not None:
-                    exit_price = 99 if snap.settled else 1
-                    entry = open_position["entry_price"]
-                    if open_position["direction"] == "yes":
-                        pnl = open_position["size"] * ((exit_price - entry) / 100.0)
-                    else:
-                        pnl = open_position["size"] * ((entry - exit_price) / 100.0)
+            elif open_position is not None and snap.settled is not None:
+                exit_price = 99 if snap.settled else 1
+                entry = open_position["entry_price"]
+                if open_position["direction"] == "yes":
+                    pnl = open_position["size"] * ((exit_price - entry) / 100.0)
+                else:
+                    pnl = open_position["size"] * ((entry - exit_price) / 100.0)
 
-                    trade_log.append({
-                        "ticker": open_position["ticker"],
-                        "direction": open_position["direction"],
-                        "entry_price": entry,
-                        "exit_price": exit_price,
-                        "pnl": pnl,
-                        "hold_bars": snap.timestamp - open_position["entry_bar"],
-                    })
-                    pnl_series.append(pnl)
-                    open_position = None
+                trade_log.append({
+                    "ticker": open_position["ticker"],
+                    "direction": open_position["direction"],
+                    "entry_price": entry,
+                    "exit_price": exit_price,
+                    "pnl": pnl,
+                    "hold_bars": snap.timestamp - open_position["entry_bar"],
+                })
+                pnl_series.append(pnl)
+                open_position = None
 
-        return self._compute_result(strategy.name, trade_log, pnl_series)
+        return trade_log, pnl_series
 
     def _compute_result(self, name: str, trade_log: List[Dict], pnl_series: List[float]) -> BacktestResult:
         if not trade_log:
