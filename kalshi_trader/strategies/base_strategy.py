@@ -31,9 +31,11 @@ class BaseStrategy(ABC):
         if self.exit_profit_cents > 0 and entry_price is not None and market.mid_price is not None:
             if direction == "yes":
                 profit = market.mid_price - entry_price
-            else:
+            elif direction == "no":
                 profit = entry_price - market.mid_price
-            if profit >= self.exit_profit_cents:
+            else:
+                profit = None
+            if profit is not None and profit >= self.exit_profit_cents:
                 return True
         if self.exit_time_hours > 0 and entry_ts is not None:
             elapsed_hours = (_time.time() - entry_ts) / 3600

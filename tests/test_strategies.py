@@ -131,3 +131,20 @@ def test_on_exit_no_direction():
     )
     assert s.on_exit(entry_price=58, entry_ts=int(time.time()), direction="no",
                      market=snap, signals=make_signals()) is True
+
+
+def test_on_exit_none_entry_price_skips_profit_check():
+    """on_exit with entry_price=None must not raise and must return False for profit check."""
+    s = MarketMakerStrategy(exit_profit_cents=10)
+    snap = make_snapshot()
+    result = s.on_exit(entry_price=None, entry_ts=int(time.time()), direction="yes",
+                       market=snap, signals=make_signals())
+    assert result is False
+
+
+def test_on_exit_none_entry_ts_skips_time_check():
+    """on_exit with entry_ts=None must not raise and must return False for time check."""
+    s = DirectionalStrategy(exit_time_hours=1)
+    result = s.on_exit(entry_price=45, entry_ts=None, direction="yes",
+                       market=make_snapshot(), signals=make_signals())
+    assert result is False
