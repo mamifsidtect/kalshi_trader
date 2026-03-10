@@ -27,16 +27,9 @@ SIGNAL_FEED = deque(maxlen=200)
 
 
 def _update_correlated_prices(arb_strategy: ArbitrageStrategy, ext_signals) -> None:
-    """
-    Populate ArbitrageStrategy with external probabilities from poll data.
-    Each poll entry with a 'kalshi_ticker' key and 'community_prediction' float
-    is registered as a correlated price. Extend this function to add more sources.
-    """
-    for poll in ext_signals.poll_data:
-        ticker = poll.get("kalshi_ticker")
-        prob = poll.get("community_prediction")
-        if ticker and isinstance(prob, (int, float)):
-            arb_strategy.set_correlated_price(ticker, float(prob))
+    """Feed Polymarket-sourced probabilities into ArbitrageStrategy."""
+    for ticker, prob in ext_signals.correlated_prices.items():
+        arb_strategy.set_correlated_price(ticker, prob)
 
 
 def trading_loop(cfg, client, risk_manager, executor, logger):
@@ -58,6 +51,39 @@ def trading_loop(cfg, client, risk_manager, executor, logger):
             snapshots = market_collector.collect_once()
             ext_signals = signal_collector.collect()
             _update_correlated_prices(arb_strategy, ext_signals)
+
+            # Check open positions for settlement or early exit
+            strategy_map = {s.name: s for s in strategies}
+            for ticker in list(risk_manager._open_positions.keys()):
+                snap = next((s for s in snapshots if s.ticker == ticker), None)
+                if snap is None:
+                    continue
+                meta = risk_manager.get_position_meta(ticker)
+                if meta is None:
+                    continue
+
+                if snap.settled is not None:
+                    # Market settled — close regardless of strategy
+                    exit_price = 99 if snap.settled else 1
+                    if cfg.execution_mode == "paper":
+                        executor.close_position(ticker, exit_price)
+                    risk_manager.close_position(ticker)
+                    logger.info(
+                        f"Settled close: {ticker} ({'YES' if snap.settled else 'NO'}) @ {exit_price}c"
+                    )
+
+                else:
+                    strategy = strategy_map.get(meta.strategy_name)
+                    if strategy and strategy.on_exit(
+                        meta.entry_price, meta.entry_ts, meta.direction, snap, ext_signals
+                    ):
+                        # Strategy requested early close
+                        if cfg.execution_mode == "paper":
+                            executor.close_position(ticker, int(snap.mid_price or meta.entry_price or 50))
+                        else:
+                            executor.close_position(ticker)
+                        risk_manager.close_position(ticker)
+                        logger.info(f"Early exit: {ticker} via {meta.strategy_name}")
 
             for snap in snapshots:
                 for strategy in strategies:
@@ -92,7 +118,13 @@ def trading_loop(cfg, client, risk_manager, executor, logger):
                         if result.get("status") not in ("rejected",):
                             cost = signal.size * (entry_price / 100.0)
                             risk_manager.record_open_position(
-                                signal.ticker, cost, category=snap.category
+                                signal.ticker,
+                                cost,
+                                category=snap.category,
+                                entry_price=entry_price,
+                                entry_ts=int(time.time()),
+                                direction=signal.direction,
+                                strategy_name=signal.strategy_name,
                             )
 
         except KeyboardInterrupt:
