@@ -66,3 +66,22 @@ class DataService:
         if category:
             markets = [m for m in markets if m.get("category") == category]
         return markets
+
+    def get_live_mid_price(self, client, ticker: str) -> Optional[float]:
+        """
+        Fetch live orderbook and return best-bid/best-ask mid price.
+        Returns None if orderbook is unavailable or empty.
+        """
+        try:
+            ob = client.get_orderbook(ticker)
+            yes_levels = ob.get("yes", [])
+            no_levels = ob.get("no", [])
+            best_yes_bid = yes_levels[0][0] if yes_levels else None
+            best_no_bid = no_levels[0][0] if no_levels else None
+            # yes_ask = 100 - best_no_bid (Kalshi binary complement)
+            yes_ask = (100 - best_no_bid) if best_no_bid is not None else None
+            if best_yes_bid is not None and yes_ask is not None:
+                return (best_yes_bid + yes_ask) / 2.0
+            return None
+        except Exception:
+            return None

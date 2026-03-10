@@ -19,6 +19,7 @@ from kalshi_trader.risk.risk_manager import RiskManager
 from kalshi_trader.execution.paper_trader import PaperTrader
 from kalshi_trader.execution.live_trader import LiveTrader
 from kalshi_trader.utils.logger import get_logger
+from kalshi_trader.web.services.data_service import DataService
 from collections import deque
 
 SIGNAL_FEED = deque(maxlen=200)
@@ -44,6 +45,7 @@ def trading_loop(cfg, client, risk_manager, executor, logger):
     arb_strategy = ArbitrageStrategy()
     strategies = [MarketMakerStrategy(), DirectionalStrategy(), arb_strategy]
     last_reset_date = datetime.now(timezone.utc).date()
+    _data_service = DataService(cfg)
 
     while True:
         try:
@@ -63,11 +65,12 @@ def trading_loop(cfg, client, risk_manager, executor, logger):
                     if signal is None:
                         continue
 
-                    # Use correct side price
+                    # Use live orderbook mid if available, else fall back to snapshot
+                    live_mid = _data_service.get_live_mid_price(client, snap.ticker)
                     if signal.direction == "yes":
-                        entry_price = snap.yes_ask or 50
+                        entry_price = int(live_mid) if live_mid is not None else (snap.yes_ask or 50)
                     else:
-                        entry_price = snap.no_ask or 50
+                        entry_price = int(100 - live_mid) if live_mid is not None else (snap.no_ask or 50)
 
                     approved, reason = risk_manager.validate(
                         signal, current_price=entry_price, category=snap.category
