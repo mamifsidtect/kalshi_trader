@@ -7,9 +7,12 @@ import time
 class DirectionalStrategy(BaseStrategy):
     name = "Directional"
 
-    def __init__(self, confidence_threshold: float = 0.6, contracts: int = 1):
+    def __init__(self, confidence_threshold: float = 0.6, contracts: int = 1,
+                 exit_profit_cents: int = 0, exit_time_hours: int = 0):
         self.confidence_threshold = confidence_threshold
         self.contracts = contracts
+        self.exit_profit_cents = exit_profit_cents
+        self.exit_time_hours = exit_time_hours
 
     def on_market_update(self, market: MarketSnapshot, signals: ExternalSignals) -> Optional[Signal]:
         confidence, direction, reason = self._score(market, signals)

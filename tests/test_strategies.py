@@ -82,3 +82,52 @@ def test_arbitrage_no_signal_when_no_pairs():
     s = ArbitrageStrategy()
     sig = s.on_market_update(make_snapshot(), make_signals())
     assert sig is None
+
+
+def test_on_exit_profit_target_yes():
+    """on_exit returns True when YES profit target is hit."""
+    s = MarketMakerStrategy(exit_profit_cents=10)
+    # Entry at 40, current mid=51 → profit=11 >= 10
+    snap = MarketSnapshot(
+        ticker="T", timestamp=int(time.time()),
+        yes_bid=50, yes_ask=52, no_bid=48, no_ask=50,
+        volume=100, open_interest=50, category="financial"
+    )
+    assert s.on_exit(entry_price=40, entry_ts=int(time.time()), direction="yes",
+                     market=snap, signals=make_signals()) is True
+
+
+def test_on_exit_profit_target_not_hit():
+    """on_exit returns False when profit target not yet reached."""
+    s = MarketMakerStrategy(exit_profit_cents=20)
+    snap = make_snapshot()  # mid=41, entry=40, profit=1 < 20
+    assert s.on_exit(entry_price=40, entry_ts=int(time.time()), direction="yes",
+                     market=snap, signals=make_signals()) is False
+
+
+def test_on_exit_time_limit():
+    """on_exit returns True when time limit exceeded."""
+    s = DirectionalStrategy(exit_time_hours=1)
+    old_ts = int(time.time()) - 3700  # over 1 hour ago
+    assert s.on_exit(entry_price=45, entry_ts=old_ts, direction="yes",
+                     market=make_snapshot(), signals=make_signals()) is True
+
+
+def test_on_exit_no_exit_when_disabled():
+    """on_exit returns False when both checks are disabled (0)."""
+    s = ArbitrageStrategy(exit_profit_cents=0, exit_time_hours=0)
+    assert s.on_exit(entry_price=45, entry_ts=int(time.time()), direction="yes",
+                     market=make_snapshot(), signals=make_signals()) is False
+
+
+def test_on_exit_no_direction():
+    """on_exit for NO direction: profit when YES price falls."""
+    s = MarketMakerStrategy(exit_profit_cents=10)
+    # Entry (NO) at entry_price=58 (YES was 42), current YES mid=30 → NO profit = 58-30=28 >= 10
+    snap = MarketSnapshot(
+        ticker="T", timestamp=int(time.time()),
+        yes_bid=28, yes_ask=32, no_bid=68, no_ask=72,
+        volume=100, open_interest=50, category="financial"
+    )
+    assert s.on_exit(entry_price=58, entry_ts=int(time.time()), direction="no",
+                     market=snap, signals=make_signals()) is True

@@ -7,10 +7,13 @@ import time
 class MarketMakerStrategy(BaseStrategy):
     name = "MarketMaker"
 
-    def __init__(self, min_spread: int = 3, min_volume: int = 100, contracts_per_quote: int = 1):
+    def __init__(self, min_spread: int = 3, min_volume: int = 100, contracts_per_quote: int = 1,
+                 exit_profit_cents: int = 0, exit_time_hours: int = 0):
         self.min_spread = min_spread
         self.min_volume = min_volume
         self.contracts_per_quote = contracts_per_quote
+        self.exit_profit_cents = exit_profit_cents
+        self.exit_time_hours = exit_time_hours
 
     def on_market_update(self, market: MarketSnapshot, signals: ExternalSignals) -> Optional[Signal]:
         if market.spread is None or market.spread < self.min_spread:

@@ -7,9 +7,12 @@ import time
 class ArbitrageStrategy(BaseStrategy):
     name = "Arbitrage"
 
-    def __init__(self, min_edge: float = 0.05, contracts: int = 1):
+    def __init__(self, min_edge: float = 0.05, contracts: int = 1,
+                 exit_profit_cents: int = 0, exit_time_hours: int = 0):
         self.min_edge = min_edge
         self.contracts = contracts
+        self.exit_profit_cents = exit_profit_cents
+        self.exit_time_hours = exit_time_hours
         self._correlated_prices: Dict[str, float] = {}
 
     def set_correlated_price(self, ticker: str, implied_prob: float):
