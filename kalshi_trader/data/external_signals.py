@@ -129,6 +129,7 @@ class ExternalSignalCollector:
             "economic_releases": signals.economic_releases,
             "news_headlines": signals.news_headlines,
             "poll_data": signals.poll_data,
+            "correlated_prices": signals.correlated_prices,
         }).encode()
         fd, tmp_path = tempfile.mkstemp(dir=self.config.data_dir, suffix=".tmp")
         try:
@@ -147,4 +148,5 @@ class ExternalSignalCollector:
             economic_releases=d.get("economic_releases", []),
             news_headlines=d.get("news_headlines", []),
             poll_data=d.get("poll_data", []),
+            correlated_prices=d.get("correlated_prices", {}),
         )
