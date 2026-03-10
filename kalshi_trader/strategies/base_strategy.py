@@ -32,7 +32,8 @@ class BaseStrategy(ABC):
             if direction == "yes":
                 profit = market.mid_price - entry_price
             elif direction == "no":
-                profit = entry_price - market.mid_price
+                # entry_price is the NO price paid; current NO mid = 100 - YES_mid
+                profit = (100 - market.mid_price) - entry_price
             else:
                 profit = None
             if profit is not None and profit >= self.exit_profit_cents:

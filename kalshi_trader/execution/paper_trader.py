@@ -49,14 +49,16 @@ class PaperTrader:
         if ticker not in self._positions:
             return None
         pos = self._positions.pop(ticker)
-        pnl = pos["size"] * ((exit_price - pos["entry_price"]) / 100.0)
-        if pos["direction"] == "no":
-            pnl = -pnl
-        self.realized_pnl += pnl
         if pos["direction"] == "yes":
+            # exit_price is YES price; entry_price is YES price paid
+            pnl = pos["size"] * ((exit_price - pos["entry_price"]) / 100.0)
             self.bankroll += pos["size"] * (exit_price / 100.0)
         else:
-            self.bankroll += pos["size"] * ((100 - exit_price) / 100.0)
+            # entry_price is NO price paid; exit_price is YES price (bankroll uses 100-exit_price)
+            current_no_price = 100 - exit_price
+            pnl = pos["size"] * ((current_no_price - pos["entry_price"]) / 100.0)
+            self.bankroll += pos["size"] * (current_no_price / 100.0)
+        self.realized_pnl += pnl
         close_record = {**pos, "exit_price": exit_price, "pnl": pnl, "status": "closed"}
         self._order_log.append(close_record)
         self._persist_log()

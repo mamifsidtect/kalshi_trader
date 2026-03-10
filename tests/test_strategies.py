@@ -121,9 +121,13 @@ def test_on_exit_no_exit_when_disabled():
 
 
 def test_on_exit_no_direction():
-    """on_exit for NO direction: profit when YES price falls."""
+    """on_exit for NO direction: profit when YES price falls.
+
+    entry_price=58 means we paid 58c for the NO contract (YES was at 42c).
+    Current YES mid = (28+32)/2 = 30c → current NO mid = 100 - 30 = 70c.
+    Profit = current_NO_mid - entry_NO_price = (100 - 30) - 58 = 12c >= 10c target.
+    """
     s = MarketMakerStrategy(exit_profit_cents=10)
-    # Entry (NO) at entry_price=58 (YES was 42), current YES mid=30 → NO profit = 58-30=28 >= 10
     snap = MarketSnapshot(
         ticker="T", timestamp=int(time.time()),
         yes_bid=28, yes_ask=32, no_bid=68, no_ask=72,

@@ -63,13 +63,20 @@ def trading_loop(cfg, client, risk_manager, executor, logger):
                     continue
 
                 if snap.settled is not None:
-                    # Market settled — close regardless of strategy
-                    exit_price = 99 if snap.settled else 1
+                    # Market settled — close regardless of strategy.
+                    # snap.settled=True means YES won (100c for YES, 0c for NO).
+                    # snap.settled=False means NO won (0c for YES, 100c for NO).
+                    yes_won = snap.settled
+                    if meta.direction == "yes":
+                        exit_price = 100 if yes_won else 0
+                    else:
+                        exit_price = 100 if not yes_won else 0
                     if cfg.execution_mode == "paper":
                         executor.close_position(ticker, exit_price)
                     risk_manager.close_position(ticker)
                     logger.info(
-                        f"Settled close: {ticker} ({'YES' if snap.settled else 'NO'}) @ {exit_price}c"
+                        f"Settled close: {ticker} ({'YES' if yes_won else 'NO'} won) "
+                        f"direction={meta.direction} @ {exit_price}c"
                     )
 
                 else:
