@@ -14,6 +14,7 @@ from kalshi_trader.data.market_collector import MarketCollector
 from kalshi_trader.data.external_signals import ExternalSignalCollector
 from kalshi_trader.strategies.market_maker import MarketMakerStrategy
 from kalshi_trader.strategies.directional import DirectionalStrategy
+from kalshi_trader.strategies.arbitrage import ArbitrageStrategy
 from kalshi_trader.risk.risk_manager import RiskManager
 from kalshi_trader.execution.paper_trader import PaperTrader
 from kalshi_trader.execution.live_trader import LiveTrader
@@ -23,11 +24,25 @@ from collections import deque
 SIGNAL_FEED = deque(maxlen=200)
 
 
+def _update_correlated_prices(arb_strategy: ArbitrageStrategy, ext_signals) -> None:
+    """
+    Populate ArbitrageStrategy with external probabilities from poll data.
+    Each poll entry with a 'kalshi_ticker' key and 'community_prediction' float
+    is registered as a correlated price. Extend this function to add more sources.
+    """
+    for poll in ext_signals.poll_data:
+        ticker = poll.get("kalshi_ticker")
+        prob = poll.get("community_prediction")
+        if ticker and isinstance(prob, (int, float)):
+            arb_strategy.set_correlated_price(ticker, float(prob))
+
+
 def trading_loop(cfg, client, risk_manager, executor, logger):
     from datetime import datetime, timezone
     market_collector = MarketCollector(client, cfg)
     signal_collector = ExternalSignalCollector(cfg)
-    strategies = [MarketMakerStrategy(), DirectionalStrategy()]
+    arb_strategy = ArbitrageStrategy()
+    strategies = [MarketMakerStrategy(), DirectionalStrategy(), arb_strategy]
     last_reset_date = datetime.now(timezone.utc).date()
 
     while True:
@@ -40,6 +55,7 @@ def trading_loop(cfg, client, risk_manager, executor, logger):
 
             snapshots = market_collector.collect_once()
             ext_signals = signal_collector.collect()
+            _update_correlated_prices(arb_strategy, ext_signals)
 
             for snap in snapshots:
                 for strategy in strategies:
