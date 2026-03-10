@@ -99,6 +99,7 @@ def test_get_all_markets_sparkline_excludes_nulls(tmp_path):
     assert None not in sparkline
     assert len(sparkline) == 2
     assert sparkline[0] == pytest.approx(42.5)
+    assert sparkline[1] == pytest.approx(44.5)
 
 
 def test_get_all_markets_sparkline_max_20(tmp_path):

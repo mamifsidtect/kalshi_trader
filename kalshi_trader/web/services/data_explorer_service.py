@@ -54,6 +54,7 @@ class DataExplorerService:
             if summary:
                 results.append(summary)
 
+        results.sort(key=lambda m: m["ticker"])
         return results
 
     def get_market_snapshots(self, ticker: str) -> List[Dict]:
@@ -101,7 +102,7 @@ class DataExplorerService:
             yes_bid = data.get("yes_bid")
             yes_ask = data.get("yes_ask")
             mid_price = (yes_bid + yes_ask) / 2.0 if yes_bid is not None and yes_ask is not None else None
-            spread = int(yes_ask - yes_bid) if yes_bid is not None and yes_ask is not None else None
+            spread = round(yes_ask - yes_bid) if yes_bid is not None and yes_ask is not None else None
             return {
                 "timestamp": data.get("timestamp", 0),
                 "mid_price": mid_price,
@@ -175,6 +176,8 @@ class DataExplorerService:
         e = datetime.strptime(end, "%Y-%m-%d")
         sm = MONTHS[s.month - 1]
         em = MONTHS[e.month - 1]
+        if s == e:
+            return f"{sm} {s.day}"
         if s.month == e.month:
             return f"{sm} {s.day}–{e.day}"
         return f"{sm} {s.day}–{em} {e.day}"
