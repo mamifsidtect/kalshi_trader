@@ -47,6 +47,7 @@ class ExternalSignals:
     news_headlines: List[Dict] = field(default_factory=list)
     poll_data: List[Dict] = field(default_factory=list)
     raw: Dict[str, Any] = field(default_factory=dict)
+    correlated_prices: Dict[str, float] = field(default_factory=dict)
 
 
 @dataclass

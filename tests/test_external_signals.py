@@ -37,3 +37,14 @@ def test_cache_is_loadable_after_write(tmp_path):
     loaded = collector.load_cached()
     assert loaded is not None
     assert loaded.economic_releases == [{"id": "CPI"}]
+
+
+def test_external_signals_has_correlated_prices_field():
+    """ExternalSignals must have a correlated_prices dict field."""
+    from kalshi_trader.data.models import ExternalSignals
+    sig = ExternalSignals(timestamp=12345)
+    assert hasattr(sig, "correlated_prices")
+    assert isinstance(sig.correlated_prices, dict)
+    # Can be populated
+    sig.correlated_prices["KXTEST-1"] = 0.65
+    assert sig.correlated_prices["KXTEST-1"] == 0.65
