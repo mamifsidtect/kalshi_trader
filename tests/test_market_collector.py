@@ -31,7 +31,7 @@ def test_market_collector_saves_snapshot(tmp_path):
 
 
 def test_market_collector_derives_no_bid_no_ask(tmp_path):
-    """_market_to_dict must populate no_bid and no_ask from YES prices."""
+    """collect_once must derive no_bid and no_ask from YES prices when absent."""
     cfg = KalshiConfig(data_dir=str(tmp_path))
     mock_client = MagicMock()
     mock_client.get_markets.return_value = [{

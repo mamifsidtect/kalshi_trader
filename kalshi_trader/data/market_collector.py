@@ -27,8 +27,10 @@ class MarketCollector:
             try:
                 yes_bid = m.get("yes_bid")
                 yes_ask = m.get("yes_ask")
-                no_bid = m.get("no_bid") or (100 - yes_ask if yes_ask is not None else None)
-                no_ask = m.get("no_ask") or (100 - yes_bid if yes_bid is not None else None)
+                _raw_no_bid = m.get("no_bid")
+                no_bid = _raw_no_bid if _raw_no_bid is not None else (100 - yes_ask if yes_ask is not None else None)
+                _raw_no_ask = m.get("no_ask")
+                no_ask = _raw_no_ask if _raw_no_ask is not None else (100 - yes_bid if yes_bid is not None else None)
                 snap = MarketSnapshot(
                     ticker=m["ticker"],
                     timestamp=ts,

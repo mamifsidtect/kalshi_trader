@@ -130,8 +130,10 @@ class KalshiClient:
         _ct = getattr(m, "close_time", None)
         yes_bid = getattr(m, "yes_bid", None)
         yes_ask = getattr(m, "yes_ask", None)
-        no_bid = getattr(m, "no_bid", None) or (100 - yes_ask if yes_ask is not None else None)
-        no_ask = getattr(m, "no_ask", None) or (100 - yes_bid if yes_bid is not None else None)
+        _raw_no_bid = getattr(m, "no_bid", None)
+        no_bid = _raw_no_bid if _raw_no_bid is not None else (100 - yes_ask if yes_ask is not None else None)
+        _raw_no_ask = getattr(m, "no_ask", None)
+        no_ask = _raw_no_ask if _raw_no_ask is not None else (100 - yes_bid if yes_bid is not None else None)
         return {
             "ticker": m.ticker,
             "title": getattr(m, "title", ""),
