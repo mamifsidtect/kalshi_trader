@@ -56,3 +56,47 @@ def test_save_promoted_config_overwrites_existing():
         with open(path) as f:
             data = json.load(f)
         assert data["params"]["min_spread"] == 7
+
+
+def test_load_promoted_configs_reads_saved():
+    from kalshi_trader.research.promoter import save_promoted_config, load_promoted_configs
+    with tempfile.TemporaryDirectory() as tmp:
+        cfg = _make_config(tmp)
+        bt = _make_backtest_result()
+        save_promoted_config(cfg, "MarketMaker", {"min_spread": 3, "min_volume": 50}, bt)
+        save_promoted_config(cfg, "Directional", {"confidence_threshold": 0.7}, bt)
+
+        promoted = load_promoted_configs(cfg)
+        assert "MarketMaker" in promoted
+        assert "Directional" in promoted
+        assert promoted["MarketMaker"] == {"min_spread": 3, "min_volume": 50}
+        assert promoted["Directional"] == {"confidence_threshold": 0.7}
+
+
+def test_load_promoted_configs_missing_dir():
+    from kalshi_trader.research.promoter import load_promoted_configs
+    with tempfile.TemporaryDirectory() as tmp:
+        cfg = _make_config(tmp)
+        promoted = load_promoted_configs(cfg)
+        assert promoted == {}
+
+
+def test_load_promoted_configs_skips_malformed(caplog):
+    from kalshi_trader.research.promoter import save_promoted_config, load_promoted_configs
+    import logging
+    with tempfile.TemporaryDirectory() as tmp:
+        cfg = _make_config(tmp)
+        bt = _make_backtest_result()
+        # Save one valid config
+        save_promoted_config(cfg, "MarketMaker", {"min_spread": 3}, bt)
+        # Write one malformed file
+        bad_path = os.path.join(tmp, "promoted", "Bad.json")
+        with open(bad_path, "w") as f:
+            f.write("{not valid json")
+
+        with caplog.at_level(logging.WARNING):
+            promoted = load_promoted_configs(cfg)
+
+        assert "MarketMaker" in promoted
+        assert "Bad" not in promoted
+        assert any("malformed" in r.message.lower() for r in caplog.records)

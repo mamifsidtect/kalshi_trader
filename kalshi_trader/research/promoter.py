@@ -53,3 +53,42 @@ def save_promoted_config(
 
     log.info(f"Promoted {strategy_name} config to {path}")
     return path
+
+
+def load_promoted_configs(config: KalshiConfig) -> Dict[str, Dict[str, Any]]:
+    """Load all promoted configs. Returns {strategy_name: params_dict}."""
+    log = get_logger(__name__, config.log_level)
+    promoted_dir = _promoted_dir(config)
+    if not os.path.isdir(promoted_dir):
+        return {}
+
+    configs = {}
+    now = datetime.now(timezone.utc)
+    for filename in os.listdir(promoted_dir):
+        if not filename.endswith(".json"):
+            continue
+        path = os.path.join(promoted_dir, filename)
+        try:
+            with open(path) as f:
+                data = json.load(f)
+            name = data["strategy_name"]
+            params = data["params"]
+
+            # Log age for staleness awareness
+            promoted_at = data.get("promoted_at", "")
+            if promoted_at:
+                try:
+                    dt = datetime.fromisoformat(promoted_at)
+                    age = now - dt
+                    days = age.days
+                    log.info(f"Loaded {name} config (promoted {days} day{'s' if days != 1 else ''} ago)")
+                except (ValueError, TypeError):
+                    log.info(f"Loaded {name} config (unknown age)")
+            else:
+                log.info(f"Loaded {name} config (unknown age)")
+
+            configs[name] = params
+        except (json.JSONDecodeError, KeyError, OSError) as e:
+            log.warning(f"Skipping malformed promoted config {filename}: {e}")
+
+    return configs
