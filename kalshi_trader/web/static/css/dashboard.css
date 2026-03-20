@@ -27,3 +27,16 @@ button { background: #4f6ef7; color: #fff; border: none; padding: 0.5rem 1.25rem
 button:hover { background: #3b5bdb; }
 canvas { margin-top: 1.5rem; background: #1a1d27; border-radius: 8px; padding: 1rem; }
 pre { background: #1a1d27; padding: 1rem; border-radius: 8px; overflow-x: auto; font-size: 0.85rem; }
+h3 { font-size: 1rem; margin: 1.25rem 0 0.5rem; color: #c0c4d8; }
+.progress-bar-container { width: 100%; background: #1a1d27; border: 1px solid #2d3148; border-radius: 4px; height: 24px; margin: 1rem 0 0.5rem; overflow: hidden; }
+.progress-bar { height: 100%; background: linear-gradient(90deg, #4f6ef7, #8b9cf4); border-radius: 4px; transition: width 0.3s ease; width: 0%; }
+.progress-text { font-size: 0.85rem; color: #8b8ea0; }
+.table-container { max-height: 500px; overflow-y: auto; border-radius: 8px; margin-bottom: 2rem; }
+.table-container table { border-radius: 0; }
+.table-container thead th { position: sticky; top: 0; background: #1a1d27; z-index: 1; }
+td { font-size: 0.85rem; }
+.result-strategy-label { font-size: 0.9rem; color: #8b9cf4; font-weight: 400; margin-left: 0.5rem; }
+.trade-count { font-size: 0.85rem; color: #8b8ea0; font-weight: 400; margin-left: 0.5rem; }
+button:disabled { background: #2d3148; cursor: not-allowed; opacity: 0.6; }
+button + button { background: #2d3148; border: 1px solid #4f6ef7; }
+button + button:hover:not(:disabled) { background: #3b5bdb; }

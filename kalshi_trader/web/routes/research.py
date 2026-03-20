@@ -19,6 +19,11 @@ class BacktestRequest(BaseModel):
     min_divergence: Optional[float] = 0.05
 
 
+class SweepRequest(BaseModel):
+    strategy: str
+    days: int = 7
+
+
 @router.get("/research/signals", response_class=HTMLResponse)
 async def signal_explorer(request: Request):
     return templates.TemplateResponse(request, "research_signals.html")
@@ -67,6 +72,57 @@ async def run_backtest(req: BacktestRequest, request: Request):
         "max_drawdown": result.max_drawdown,
         "meets_promotion_gate": result.meets_promotion_gate(cfg),
         "trade_log": result.trade_log[:50],
+    }
+
+
+@router.post("/api/v1/research/sweep")
+async def run_sweep(req: SweepRequest, request: Request):
+    from kalshi_trader.research.parameter_sweeper import ParameterSweeper
+    from kalshi_trader.data.models import ExternalSignals
+
+    cfg = request.app.state.config
+    data_service = request.app.state.data_service
+    snapshots = data_service.get_recent_snapshots(days=req.days)
+    if not snapshots:
+        return {"error": "no_data", "message": "No snapshots found. Run data collection first."}
+
+    blank_signals = ExternalSignals(timestamp=int(time.time()))
+    sweeper = ParameterSweeper(cfg)
+    report = sweeper.sweep(req.strategy, snapshots, lambda ts: blank_signals)
+
+    top_results = []
+    for r in report.all_results[:20]:
+        top_results.append({
+            "params": r.params,
+            "backtest": {
+                "total_trades": r.backtest.total_trades,
+                "win_rate": r.backtest.win_rate,
+                "total_pnl": r.backtest.total_pnl,
+                "sharpe": r.backtest.sharpe,
+                "max_drawdown": r.backtest.max_drawdown,
+            },
+            "promoted": r.promoted,
+        })
+
+    best = None
+    if report.best:
+        best = {
+            "params": report.best.params,
+            "backtest": {
+                "total_trades": report.best.backtest.total_trades,
+                "win_rate": report.best.backtest.win_rate,
+                "total_pnl": report.best.backtest.total_pnl,
+                "sharpe": report.best.backtest.sharpe,
+                "max_drawdown": report.best.backtest.max_drawdown,
+            },
+        }
+
+    return {
+        "strategy": req.strategy,
+        "total_combinations": report.total_combinations,
+        "promoted_count": len(report.promoted_results),
+        "best": best,
+        "top_results": top_results,
     }
 
 

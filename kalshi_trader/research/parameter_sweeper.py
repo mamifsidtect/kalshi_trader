@@ -6,6 +6,7 @@ exhaustively searches a predefined parameter grid, backtests each combination,
 and returns the best configuration (if any passes the gate).
 """
 import itertools
+import time
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Callable, Optional, Type
 
@@ -126,9 +127,15 @@ class ParameterSweeper:
             f"Starting parameter sweep for {strategy_name}: "
             f"{len(combos)} combinations across {len(param_names)} params"
         )
+        self.logger.info(f"  Parameters: {', '.join(param_names)}")
 
+        # Suppress per-ticker logging during sweep (backtester runs many times)
         bt = Backtester(self.config)
+        bt.logger.setLevel(40)  # ERROR only during sweep
         report = SweepReport(total_combinations=len(combos))
+        promoted_count = 0
+        best_sharpe = float("-inf")
+        sweep_start = time.time()
 
         for i, combo in enumerate(combos):
             params = dict(zip(param_names, combo))
@@ -144,8 +151,22 @@ class ParameterSweeper:
             )
             report.all_results.append(sr)
 
-            if (i + 1) % 50 == 0:
-                self.logger.info(f"  Sweep progress: {i + 1}/{len(combos)}")
+            if promoted:
+                promoted_count += 1
+            if result.sharpe > best_sharpe:
+                best_sharpe = result.sharpe
+
+            if (i + 1) % 25 == 0 or (i + 1) == len(combos):
+                elapsed = time.time() - sweep_start
+                rate = (i + 1) / elapsed if elapsed > 0 else 0
+                eta = (len(combos) - i - 1) / rate if rate > 0 else 0
+                pct = (i + 1) / len(combos) * 100
+                self.logger.info(
+                    f"  Sweep progress: {i + 1}/{len(combos)} ({pct:.0f}%) | "
+                    f"promoted: {promoted_count} | "
+                    f"best sharpe: {best_sharpe:.2f} | "
+                    f"ETA: {eta:.0f}s"
+                )
 
         # Sort: promoted first, then by rank_by descending
         report.all_results.sort(

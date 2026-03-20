@@ -46,30 +46,50 @@ def main():
     logger = get_logger("run_research", cfg.log_level)
 
     # Load snapshots from local storage
+    logger.info(f"Loading snapshots from last {args.days} days...")
     collector = MarketCollector(None, cfg)
     snapshots = []
+    dates_found = 0
+    tickers_seen = set()
     for i in range(args.days):
         date = (datetime.now(timezone.utc) - timedelta(days=i)).strftime("%Y-%m-%d")
         date_dir = os.path.join(cfg.data_dir, date)
         if not os.path.exists(date_dir):
+            logger.info(f"  {date}: no data directory")
             continue
-        for ticker in os.listdir(date_dir):
-            snapshots.extend(collector.load_snapshots(ticker, date))
+        date_tickers = os.listdir(date_dir)
+        date_snap_count = 0
+        for ticker in date_tickers:
+            loaded = collector.load_snapshots(ticker, date)
+            snapshots.extend(loaded)
+            date_snap_count += len(loaded)
+            tickers_seen.add(ticker)
+        dates_found += 1
+        logger.info(f"  {date}: {len(date_tickers)} tickers, {date_snap_count} snapshots")
 
     if not snapshots:
         logger.warning("No snapshots found. Run collect_data.py first.")
         return
 
-    logger.info(f"Loaded {len(snapshots)} snapshots across {args.days} days")
+    settled_count = sum(1 for s in snapshots if s.settled is not None)
+    logger.info(
+        f"Loaded {len(snapshots)} snapshots | "
+        f"{dates_found} days | "
+        f"{len(tickers_seen)} unique tickers | "
+        f"{settled_count} with settlement data"
+    )
 
     if args.backfill:
+        logger.info("Starting settlement data backfill...")
         from kalshi_trader.client.kalshi_client import KalshiClient
         client = KalshiClient(cfg)
         for i in range(args.days):
             date = (datetime.now(timezone.utc) - timedelta(days=i)).strftime("%Y-%m-%d")
+            logger.info(f"  Backfilling {date}...")
             backfill_collector = MarketCollector(client, cfg)
             backfill_collector.backfill_settlement(date)
         # Reload snapshots after backfill
+        logger.info("Reloading snapshots after backfill...")
         snapshots = []
         for i in range(args.days):
             date = (datetime.now(timezone.utc) - timedelta(days=i)).strftime("%Y-%m-%d")
@@ -78,7 +98,11 @@ def main():
                 continue
             for ticker in os.listdir(date_dir):
                 snapshots.extend(collector.load_snapshots(ticker, date))
-        logger.info(f"After backfill: {len(snapshots)} snapshots")
+        settled_after = sum(1 for s in snapshots if s.settled is not None)
+        logger.info(
+            f"After backfill: {len(snapshots)} snapshots | "
+            f"{settled_after} with settlement data"
+        )
 
     # Signal tests
     tester = SignalTester(cfg)

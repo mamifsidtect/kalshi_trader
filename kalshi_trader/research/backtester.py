@@ -36,6 +36,7 @@ class Backtester:
         snapshots: List[MarketSnapshot],
         signals_fn: Callable[[int], ExternalSignals],
         slippage: Optional[int] = None,
+        progress_callback: Optional[Callable[[Dict], None]] = None,
     ) -> BacktestResult:
         slippage = slippage if slippage is not None else self.SLIPPAGE_CENTS
 
@@ -44,13 +45,53 @@ class Backtester:
         for snap in snapshots:
             by_ticker.setdefault(snap.ticker, []).append(snap)
 
+        total_tickers = len(by_ticker)
+        total_snapshots = len(snapshots)
+        self.logger.info(
+            f"Starting backtest: {strategy.name} | "
+            f"{total_snapshots} snapshots across {total_tickers} tickers"
+        )
+
         all_trades: List[Dict] = []
         all_pnl: List[float] = []
+        signals_evaluated = 0
+        signals_skipped = 0
 
-        for ticker_snaps in by_ticker.values():
-            trades, pnl = self._run_single_ticker(strategy, ticker_snaps, signals_fn, slippage)
+        for idx, (ticker, ticker_snaps) in enumerate(by_ticker.items(), 1):
+            self.logger.info(
+                f"  [{idx}/{total_tickers}] Processing {ticker} "
+                f"({len(ticker_snaps)} snapshots)"
+            )
+            trades, pnl, stats = self._run_single_ticker(
+                strategy, ticker_snaps, signals_fn, slippage
+            )
             all_trades.extend(trades)
             all_pnl.extend(pnl)
+            signals_evaluated += stats["evaluated"]
+            signals_skipped += stats["skipped"]
+
+            if trades:
+                ticker_pnl = sum(t["pnl"] for t in trades)
+                self.logger.info(
+                    f"           -> {len(trades)} trades, "
+                    f"P&L: ${ticker_pnl:.2f}"
+                )
+
+            if progress_callback:
+                progress_callback({
+                    "phase": "backtest",
+                    "ticker": ticker,
+                    "tickers_done": idx,
+                    "tickers_total": total_tickers,
+                    "trades_so_far": len(all_trades),
+                    "pnl_so_far": sum(all_pnl) if all_pnl else 0.0,
+                })
+
+        self.logger.info(
+            f"Backtest complete: {len(all_trades)} trades | "
+            f"Signals evaluated: {signals_evaluated} | "
+            f"Signals skipped (no signal): {signals_skipped}"
+        )
 
         return self._compute_result(strategy.name, all_trades, all_pnl)
 
@@ -94,6 +135,8 @@ class Backtester:
         open_position = None
         trade_log = []
         pnl_series = []
+        signals_evaluated = 0
+        signals_skipped = 0
 
         for snap in snapshots:
             signals = signals_fn(snap.timestamp)
@@ -101,10 +144,12 @@ class Backtester:
             # --- Try to close open position ---
             if open_position is not None:
                 closed = False
+                close_reason = ""
 
                 # 1. Explicit settlement
                 if snap.settled is not None:
                     exit_price = 99 if snap.settled else 1
+                    close_reason = f"settled={'YES' if snap.settled else 'NO'}"
                     closed = True
 
                 # 2. close_time passed — infer outcome from last mid_price
@@ -112,6 +157,7 @@ class Backtester:
                     close_ts = self._parse_close_time(snap.close_time)
                     if close_ts > 0 and snap.timestamp >= close_ts and snap.mid_price is not None:
                         exit_price = int(snap.mid_price)
+                        close_reason = "close_time reached"
                         closed = True
 
                 # 3. Strategy early exit (passes current_ts for backtesting)
@@ -125,6 +171,7 @@ class Backtester:
                         current_ts=snap.timestamp,
                     ):
                         exit_price = int(snap.mid_price)
+                        close_reason = "strategy exit"
                         closed = True
 
                 if closed:
@@ -135,21 +182,32 @@ class Backtester:
                         no_exit_price = 100 - exit_price
                         pnl = open_position["size"] * ((no_exit_price - entry) / 100.0)
 
+                    hold_secs = snap.timestamp - open_position["entry_bar"]
                     trade_log.append({
                         "ticker": open_position["ticker"],
                         "direction": open_position["direction"],
                         "entry_price": entry,
                         "exit_price": exit_price,
                         "pnl": pnl,
-                        "hold_bars": snap.timestamp - open_position["entry_bar"],
+                        "hold_bars": hold_secs,
+                        "close_reason": close_reason,
                     })
                     pnl_series.append(pnl)
+
+                    self.logger.debug(
+                        f"    CLOSE {open_position['ticker']} "
+                        f"{open_position['direction'].upper()} "
+                        f"entry={entry}c exit={exit_price}c "
+                        f"pnl=${pnl:.2f} ({close_reason}) "
+                        f"held {hold_secs // 3600}h{(hold_secs % 3600) // 60}m"
+                    )
                     open_position = None
                     continue
 
             # --- Try to open new position ---
             if open_position is None:
                 signal = strategy.on_market_update(snap, signals)
+                signals_evaluated += 1
                 if signal is not None and snap.mid_price is not None:
                     effective_slippage = (
                         self._estimate_vwap_slippage(snap, signal.size)
@@ -168,8 +226,15 @@ class Backtester:
                         "size": signal.size,
                         "entry_bar": snap.timestamp,
                     }
+                    self.logger.debug(
+                        f"    OPEN {snap.ticker} {signal.direction.upper()} "
+                        f"@ {entry_price}c (mid={snap.mid_price}c, "
+                        f"slippage={effective_slippage}c)"
+                    )
+                else:
+                    signals_skipped += 1
 
-        return trade_log, pnl_series
+        return trade_log, pnl_series, {"evaluated": signals_evaluated, "skipped": signals_skipped}
 
     def _compute_result(self, name: str, trade_log: List[Dict], pnl_series: List[float]) -> BacktestResult:
         if not trade_log:

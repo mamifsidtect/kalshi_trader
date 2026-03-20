@@ -4,41 +4,279 @@
 <h1>Backtester</h1>
 <form id="bt-form">
   <label>Strategy:
-    <select name="strategy">
+    <select name="strategy" id="strategy-select">
       <option value="MarketMaker">Market Maker</option>
       <option value="Directional">Directional</option>
+      <option value="SingleConditionArb">Single Condition Arb</option>
+      <option value="BregmanDivergence">Bregman Divergence</option>
     </select>
   </label>
   <label>Days of data: <input type="number" name="days" value="7" min="1" max="90"></label>
-  <button type="submit">Run Backtest</button>
+  <div id="strategy-params"></div>
+  <button type="submit" id="run-btn">Run Backtest</button>
+  <button type="button" id="sweep-btn">Parameter Sweep</button>
 </form>
+
+<div id="bt-progress" style="display:none">
+  <div class="progress-bar-container">
+    <div class="progress-bar" id="progress-fill"></div>
+  </div>
+  <p id="progress-text" class="progress-text">Starting backtest...</p>
+</div>
+
 <div id="bt-results" style="display:none">
-  <h2>Results</h2>
+  <h2>Results <span id="result-strategy" class="result-strategy-label"></span></h2>
   <div class="cards" id="bt-cards"></div>
   <canvas id="equity-chart" width="800" height="300"></canvas>
+
+  <div id="trade-log-section" style="display:none">
+    <h2>Trade Log <span id="trade-count-label" class="trade-count"></span></h2>
+    <div class="table-container">
+      <table id="trade-log-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Ticker</th>
+            <th>Direction</th>
+            <th>Entry</th>
+            <th>Exit</th>
+            <th>P&L</th>
+            <th>Hold Time</th>
+            <th>Reason</th>
+          </tr>
+        </thead>
+        <tbody id="trade-log-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="sweep-results" style="display:none">
+  <h2>Parameter Sweep Results</h2>
+  <div class="cards" id="sweep-summary-cards"></div>
+  <div id="sweep-best" style="display:none">
+    <h3>Best Configuration</h3>
+    <pre id="sweep-best-params"></pre>
+    <div class="cards" id="sweep-best-cards"></div>
+  </div>
+  <div id="sweep-top-section">
+    <h3>Top Configurations</h3>
+    <div class="table-container">
+      <table id="sweep-top-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Parameters</th>
+            <th>Sharpe</th>
+            <th>Win Rate</th>
+            <th>P&L</th>
+            <th>Trades</th>
+            <th>Gate</th>
+          </tr>
+        </thead>
+        <tbody id="sweep-top-body"></tbody>
+      </table>
+    </div>
+  </div>
 </div>
 {% endblock %}
 {% block scripts %}
 <script src="/static/js/charts.js"></script>
 <script>
+const STRATEGY_PARAM_FIELDS = {
+  MarketMaker: [
+    { name: 'min_spread', label: 'Min Spread (c)', type: 'number', default: 3 },
+  ],
+  Directional: [
+    { name: 'confidence_threshold', label: 'Confidence', type: 'number', default: 0.6, step: 0.1 },
+  ],
+  SingleConditionArb: [
+    { name: 'min_edge_cents', label: 'Min Edge (c)', type: 'number', default: 5 },
+  ],
+  BregmanDivergence: [
+    { name: 'min_divergence', label: 'Min Divergence', type: 'number', default: 0.05, step: 0.01 },
+  ],
+};
+
+function renderStrategyParams() {
+  const strategy = document.getElementById('strategy-select').value;
+  const container = document.getElementById('strategy-params');
+  const fields = STRATEGY_PARAM_FIELDS[strategy] || [];
+  container.innerHTML = fields.map(f =>
+    `<label>${f.label}: <input type="${f.type}" name="${f.name}" value="${f.default}" ${f.step ? 'step="'+f.step+'"' : ''} style="width:80px"></label>`
+  ).join('');
+}
+
+document.getElementById('strategy-select').addEventListener('change', renderStrategyParams);
+renderStrategyParams();
+
+function formatHoldTime(secs) {
+  if (secs < 60) return `${secs}s`;
+  if (secs < 3600) return `${Math.floor(secs/60)}m`;
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+
+function showProgress(text, pct) {
+  const el = document.getElementById('bt-progress');
+  el.style.display = 'block';
+  document.getElementById('progress-text').textContent = text;
+  document.getElementById('progress-fill').style.width = (pct || 0) + '%';
+}
+
+function hideProgress() {
+  document.getElementById('bt-progress').style.display = 'none';
+}
+
+function buildPayload(form) {
+  const fd = new FormData(form);
+  const payload = { strategy: fd.get('strategy'), days: parseInt(fd.get('days')) };
+  for (const [k, v] of fd.entries()) {
+    if (k !== 'strategy' && k !== 'days') {
+      payload[k] = parseFloat(v);
+    }
+  }
+  return payload;
+}
+
+// Run Backtest
 document.getElementById('bt-form').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const fd = new FormData(e.target);
-  const payload = { strategy: fd.get('strategy'), days: parseInt(fd.get('days')) };
-  const resp = await fetch('/api/v1/research/backtest', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(payload)
-  });
-  const data = await resp.json();
-  document.getElementById('bt-results').style.display = 'block';
-  document.getElementById('bt-cards').innerHTML = `
-    <div class="card"><span class="label">Trades</span><span class="value">${data.total_trades}</span></div>
-    <div class="card"><span class="label">Win Rate</span><span class="value">${(data.win_rate*100).toFixed(1)}%</span></div>
-    <div class="card"><span class="label">P&L</span><span class="value ${data.total_pnl>=0?'green':'red'}">$${data.total_pnl?.toFixed(2)}</span></div>
-    <div class="card"><span class="label">Sharpe</span><span class="value">${data.sharpe?.toFixed(2)}</span></div>
-    <div class="card"><span class="label">Gate Passed</span><span class="value">${data.meets_promotion_gate ? '✓' : '✗'}</span></div>
-  `;
-  if (data.trade_log?.length) drawEquityCurve(data.trade_log);
+  const payload = buildPayload(e.target);
+  document.getElementById('bt-results').style.display = 'none';
+  document.getElementById('sweep-results').style.display = 'none';
+  document.getElementById('run-btn').disabled = true;
+  showProgress(`Running ${payload.strategy} backtest on ${payload.days} days of data...`, 10);
+
+  try {
+    const resp = await fetch('/api/v1/research/backtest', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const data = await resp.json();
+    showProgress('Rendering results...', 90);
+
+    if (data.error) {
+      hideProgress();
+      alert(data.message || data.error);
+      return;
+    }
+
+    document.getElementById('result-strategy').textContent = data.strategy;
+    document.getElementById('bt-results').style.display = 'block';
+    document.getElementById('bt-cards').innerHTML = `
+      <div class="card"><span class="label">Trades</span><span class="value">${data.total_trades}</span></div>
+      <div class="card"><span class="label">Win Rate</span><span class="value">${(data.win_rate*100).toFixed(1)}%</span></div>
+      <div class="card"><span class="label">P&L</span><span class="value ${data.total_pnl>=0?'green':'red'}">$${data.total_pnl?.toFixed(2)}</span></div>
+      <div class="card"><span class="label">Sharpe</span><span class="value">${data.sharpe?.toFixed(2)}</span></div>
+      <div class="card"><span class="label">Max Drawdown</span><span class="value red">$${data.max_drawdown?.toFixed(2)}</span></div>
+      <div class="card"><span class="label">Gate</span><span class="value">${data.meets_promotion_gate ? '<span class="green">PASSED</span>' : '<span class="red">FAILED</span>'}</span></div>
+    `;
+
+    if (data.trade_log?.length) {
+      drawEquityCurve(data.trade_log);
+      renderTradeLog(data.trade_log);
+    } else {
+      document.getElementById('trade-log-section').style.display = 'none';
+    }
+  } catch (err) {
+    alert('Backtest failed: ' + err.message);
+  } finally {
+    hideProgress();
+    document.getElementById('run-btn').disabled = false;
+  }
+});
+
+function renderTradeLog(tradeLog) {
+  const section = document.getElementById('trade-log-section');
+  section.style.display = 'block';
+  document.getElementById('trade-count-label').textContent = `(${tradeLog.length} trades)`;
+  const tbody = document.getElementById('trade-log-body');
+  tbody.innerHTML = tradeLog.map((t, i) => {
+    const pnlClass = t.pnl >= 0 ? 'green' : 'red';
+    return `<tr>
+      <td>${i + 1}</td>
+      <td>${t.ticker}</td>
+      <td class="${t.direction === 'yes' ? 'yes' : 'no'}">${t.direction.toUpperCase()}</td>
+      <td>${t.entry_price}c</td>
+      <td>${t.exit_price}c</td>
+      <td class="${pnlClass}">$${t.pnl.toFixed(2)}</td>
+      <td>${formatHoldTime(t.hold_bars)}</td>
+      <td>${t.close_reason || '-'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// Parameter Sweep
+document.getElementById('sweep-btn').addEventListener('click', async () => {
+  const form = document.getElementById('bt-form');
+  const fd = new FormData(form);
+  const payload = {
+    strategy: fd.get('strategy'),
+    days: parseInt(fd.get('days')),
+  };
+  document.getElementById('bt-results').style.display = 'none';
+  document.getElementById('sweep-results').style.display = 'none';
+  document.getElementById('sweep-btn').disabled = true;
+  showProgress(`Running parameter sweep for ${payload.strategy}...`, 5);
+
+  try {
+    const resp = await fetch('/api/v1/research/sweep', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const data = await resp.json();
+    showProgress('Rendering sweep results...', 90);
+
+    if (data.error) {
+      hideProgress();
+      alert(data.message || data.error);
+      return;
+    }
+
+    document.getElementById('sweep-results').style.display = 'block';
+    document.getElementById('sweep-summary-cards').innerHTML = `
+      <div class="card"><span class="label">Combinations</span><span class="value">${data.total_combinations}</span></div>
+      <div class="card"><span class="label">Passed Gate</span><span class="value ${data.promoted_count > 0 ? 'green' : 'red'}">${data.promoted_count}</span></div>
+    `;
+
+    const bestSection = document.getElementById('sweep-best');
+    if (data.best) {
+      bestSection.style.display = 'block';
+      document.getElementById('sweep-best-params').textContent = JSON.stringify(data.best.params, null, 2);
+      const b = data.best.backtest;
+      document.getElementById('sweep-best-cards').innerHTML = `
+        <div class="card"><span class="label">Sharpe</span><span class="value">${b.sharpe?.toFixed(2)}</span></div>
+        <div class="card"><span class="label">Win Rate</span><span class="value">${(b.win_rate*100).toFixed(1)}%</span></div>
+        <div class="card"><span class="label">P&L</span><span class="value ${b.total_pnl>=0?'green':'red'}">$${b.total_pnl?.toFixed(2)}</span></div>
+        <div class="card"><span class="label">Trades</span><span class="value">${b.total_trades}</span></div>
+        <div class="card"><span class="label">Max DD</span><span class="value red">$${b.max_drawdown?.toFixed(2)}</span></div>
+      `;
+    } else {
+      bestSection.style.display = 'none';
+    }
+
+    const topBody = document.getElementById('sweep-top-body');
+    topBody.innerHTML = (data.top_results || []).map((r, i) => {
+      const b = r.backtest;
+      const paramStr = Object.entries(r.params).map(([k,v]) => `${k}=${v}`).join(', ');
+      return `<tr>
+        <td>${i + 1}</td>
+        <td style="font-size:0.8rem">${paramStr}</td>
+        <td>${b.sharpe?.toFixed(2)}</td>
+        <td>${(b.win_rate*100).toFixed(1)}%</td>
+        <td class="${b.total_pnl>=0?'green':'red'}">$${b.total_pnl?.toFixed(2)}</td>
+        <td>${b.total_trades}</td>
+        <td>${r.promoted ? '<span class="green">YES</span>' : '<span class="red">NO</span>'}</td>
+      </tr>`;
+    }).join('');
+  } catch (err) {
+    alert('Sweep failed: ' + err.message);
+  } finally {
+    hideProgress();
+    document.getElementById('sweep-btn').disabled = false;
+  }
 });
 </script>
 {% endblock %}

@@ -103,6 +103,12 @@ The backtester closes positions via three mechanisms (in priority order):
 2. **Close time** — market's `close_time` passes, position exits at last mid-price
 3. **Strategy exit** — `on_exit()` fires based on profit target or time limit
 
+The backtester provides verbose progress output:
+- Per-date data loading breakdown (tickers, snapshots, settlement coverage)
+- Per-ticker processing progress (`[1/15] Processing TICKER-ABC (42 snapshots)`)
+- Trade open/close events with reasons (settled, close_time, strategy exit) and hold durations
+- Summary stats: total signals evaluated vs skipped, trades generated, cumulative P&L
+
 Output includes trade count, win rate, total P&L, Sharpe ratio, max drawdown, and sample trades.
 
 ### 6. Paper trade (validate live behavior safely)
@@ -180,6 +186,8 @@ The sweeper tests all combinations from predefined parameter grids:
 
 Results are sorted by the chosen metric (sharpe or win_rate). The best promotable config is highlighted; if none pass the gate, the top 5 closest configs are shown.
 
+The sweeper provides detailed progress output every 25 combinations including percentage complete, promoted count so far, best Sharpe found, and estimated time remaining. Parameter sweeps are also available in the web dashboard via the Backtester page.
+
 ## Progression Gates
 
 ```
@@ -216,12 +224,14 @@ Runs on port 55055 by default (configurable via `DASHBOARD_PORT` env var or `--p
 
 | Page | URL | Description |
 |------|-----|-------------|
-| Dashboard | `/` | P&L, win rate, open positions, signal feed |
+| Dashboard | `/` | P&L, win rate, open positions, strategy overview, signal feed |
 | Positions | `/positions` | Live/paper positions, auto-refresh |
 | Data Explorer | `/data-explorer` | Browse collected markets, view snapshots and sparklines |
 | Signal Explorer | `/research/signals` | Historical signal accuracy |
-| Backtester | `/research/backtest` | Run backtests interactively |
+| Backtester | `/research/backtest` | Run backtests and parameter sweeps interactively |
 | Market Browser | `/research/markets` | Browse collected markets by category |
+
+The Backtester page supports all 4 strategies with per-strategy parameter controls, displays results with equity curves, a full trade log table (entry/exit/P&L/hold time/close reason), and includes a Parameter Sweep button that runs an exhaustive grid search and displays the top configurations.
 
 ## Configuration
 
