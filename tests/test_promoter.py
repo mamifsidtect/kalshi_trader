@@ -132,3 +132,74 @@ def test_sweeper_auto_promotes_best_config():
         if report.best:
             promoted = load_promoted_configs(cfg)
             assert "MarketMaker" in promoted
+
+
+def test_load_and_instantiate_strategies():
+    """Promoted configs should produce working strategy instances."""
+    from kalshi_trader.research.promoter import save_promoted_config, load_promoted_configs
+    from kalshi_trader.research.parameter_sweeper import STRATEGY_CLASSES
+    with tempfile.TemporaryDirectory() as tmp:
+        cfg = _make_config(tmp)
+        bt = _make_backtest_result()
+        save_promoted_config(cfg, "MarketMaker", {"min_spread": 5, "min_volume": 100}, bt)
+        save_promoted_config(cfg, "Directional", {"confidence_threshold": 0.7, "contracts": 1}, bt)
+
+        promoted = load_promoted_configs(cfg)
+        strategies = []
+        for name, params in promoted.items():
+            cls = STRATEGY_CLASSES.get(name)
+            assert cls is not None, f"Unknown strategy: {name}"
+            instance = cls(**params)
+            strategies.append(instance)
+
+        assert len(strategies) == 2
+        names = {s.name for s in strategies}
+        assert "MarketMaker" in names
+        assert "Directional" in names
+
+
+def test_load_skips_incompatible_params():
+    """Strategy with unknown params should be skipped, not crash."""
+    from kalshi_trader.research.promoter import save_promoted_config, load_promoted_configs
+    from kalshi_trader.research.parameter_sweeper import STRATEGY_CLASSES
+    from kalshi_trader.strategies.arbitrage import ArbitrageStrategy
+    with tempfile.TemporaryDirectory() as tmp:
+        cfg = _make_config(tmp)
+        bt = _make_backtest_result()
+        # Save a config with an invalid param name
+        save_promoted_config(cfg, "MarketMaker", {"nonexistent_param": 99}, bt)
+        # Save a valid config too
+        save_promoted_config(cfg, "Directional", {"confidence_threshold": 0.7}, bt)
+
+        promoted = load_promoted_configs(cfg)
+        strategies = []
+        for name, params in promoted.items():
+            cls = STRATEGY_CLASSES.get(name)
+            if cls is None:
+                continue
+            try:
+                instance = cls(**params)
+            except TypeError:
+                continue
+            strategies.append(instance)
+
+        # Only Directional should load; MarketMaker should be skipped
+        assert len(strategies) == 1
+        assert strategies[0].name == "Directional"
+
+
+def test_no_promoted_configs_returns_empty():
+    """When no promoted configs exist, load returns empty and instantiation loop produces nothing."""
+    from kalshi_trader.research.promoter import load_promoted_configs
+    from kalshi_trader.research.parameter_sweeper import STRATEGY_CLASSES
+    with tempfile.TemporaryDirectory() as tmp:
+        cfg = _make_config(tmp)
+        promoted = load_promoted_configs(cfg)
+        assert promoted == {}
+
+        strategies = []
+        for name, params in promoted.items():
+            cls = STRATEGY_CLASSES.get(name)
+            if cls:
+                strategies.append(cls(**params))
+        assert len(strategies) == 0

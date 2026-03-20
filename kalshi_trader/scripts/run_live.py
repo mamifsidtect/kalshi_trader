@@ -13,11 +13,9 @@ from kalshi_trader.config import load_config
 from kalshi_trader.client.kalshi_client import KalshiClient
 from kalshi_trader.data.market_collector import MarketCollector
 from kalshi_trader.data.external_signals import ExternalSignalCollector
-from kalshi_trader.strategies.market_maker import MarketMakerStrategy
-from kalshi_trader.strategies.directional import DirectionalStrategy
 from kalshi_trader.strategies.arbitrage import ArbitrageStrategy
-from kalshi_trader.strategies.single_condition_arb import SingleConditionArbStrategy
-from kalshi_trader.strategies.bregman_divergence import BregmanDivergenceStrategy
+from kalshi_trader.research.promoter import load_promoted_configs
+from kalshi_trader.research.parameter_sweeper import STRATEGY_CLASSES
 from kalshi_trader.risk.risk_manager import RiskManager
 from kalshi_trader.execution.paper_trader import PaperTrader
 from kalshi_trader.execution.live_trader import LiveTrader
@@ -28,8 +26,10 @@ from collections import deque
 SIGNAL_FEED = deque(maxlen=200)
 
 
-def _update_correlated_prices(arb_strategy: ArbitrageStrategy, ext_signals) -> None:
+def _update_correlated_prices(arb_strategy, ext_signals) -> None:
     """Feed Polymarket-sourced probabilities into ArbitrageStrategy."""
+    if arb_strategy is None:
+        return
     for ticker, prob in ext_signals.correlated_prices.items():
         arb_strategy.set_correlated_price(ticker, prob)
 
@@ -37,14 +37,28 @@ def _update_correlated_prices(arb_strategy: ArbitrageStrategy, ext_signals) -> N
 def trading_loop(cfg, client, risk_manager, executor, logger):
     market_collector = MarketCollector(client, cfg)
     signal_collector = ExternalSignalCollector(cfg)
-    arb_strategy = ArbitrageStrategy()
-    strategies = [
-        MarketMakerStrategy(),
-        DirectionalStrategy(),
-        arb_strategy,
-        SingleConditionArbStrategy(),
-        BregmanDivergenceStrategy(),
-    ]
+
+    promoted = load_promoted_configs(cfg)
+    strategies = []
+    arb_strategy = None
+    for name, params in promoted.items():
+        cls = STRATEGY_CLASSES.get(name)
+        if cls is None:
+            logger.warning(f"Unknown strategy in promoted config: {name}")
+            continue
+        try:
+            instance = cls(**params)
+        except TypeError as e:
+            logger.warning(f"Skipping {name}: promoted params incompatible with constructor: {e}")
+            continue
+        strategies.append(instance)
+        if isinstance(instance, ArbitrageStrategy):
+            arb_strategy = instance
+        logger.info(f"Loaded promoted config for {name}: {params}")
+
+    if not strategies:
+        logger.warning("No promoted configs found. Run a parameter sweep first.")
+        return
     last_reset_date = datetime.now(timezone.utc).date()
     _data_service = DataService(cfg)
 
