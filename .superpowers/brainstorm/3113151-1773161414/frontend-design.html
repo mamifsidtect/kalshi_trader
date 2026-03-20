@@ -1,0 +1,112 @@
+<h2>Section 3: Frontend Design</h2>
+<p class="subtitle">Two pages — does this match what you're imagining?</p>
+
+<div class="section">
+  <h3>Page 1 — Coverage Overview (<code>/data-explorer</code>)</h3>
+  <div class="mockup">
+    <div class="mockup-header">http://localhost:55055/data-explorer</div>
+    <div class="mockup-body" style="background:#0d1117;padding:16px;font-family:monospace;">
+      <div class="mock-nav" style="font-size:12px;margin-bottom:12px;">
+        Dashboard &nbsp;|&nbsp; Positions &nbsp;|&nbsp; Signals &nbsp;|&nbsp; Backtest &nbsp;|&nbsp; Markets &nbsp;|&nbsp; <strong style="color:#58a6ff;">Data Explorer</strong>
+      </div>
+      <div style="margin-bottom:10px;">
+        <span style="font-size:14px;color:#cdd9e5;font-weight:bold;">Data Explorer</span>
+        <span style="float:right;font-size:11px;color:#8b949e;">23 markets · 4 days · 8,421 snapshots</span>
+      </div>
+      <!-- Category tabs -->
+      <div style="display:flex;gap:6px;margin-bottom:12px;">
+        <div style="background:#1f6feb;color:white;padding:3px 10px;border-radius:12px;font-size:11px;">All</div>
+        <div style="background:#161b22;border:1px solid #30363d;color:#8b949e;padding:3px 10px;border-radius:12px;font-size:11px;">financial</div>
+        <div style="background:#161b22;border:1px solid #30363d;color:#8b949e;padding:3px 10px;border-radius:12px;font-size:11px;">economic</div>
+        <div style="background:#161b22;border:1px solid #30363d;color:#8b949e;padding:3px 10px;border-radius:12px;font-size:11px;">sports</div>
+        <div style="background:#161b22;border:1px solid #30363d;color:#8b949e;padding:3px 10px;border-radius:12px;font-size:11px;">weather</div>
+      </div>
+      <!-- Card grid -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <!-- Card 1 -->
+        <div style="background:#161b22;border:1px solid #30363d;border-radius:6px;padding:10px;cursor:pointer;">
+          <div style="font-size:11px;font-weight:bold;color:#cdd9e5;margin-bottom:2px;">KXBTC-25DEC-T50000</div>
+          <div style="font-size:9px;color:#8b949e;margin-bottom:6px;">financial · 842 snapshots · 4 days</div>
+          <svg viewBox="0 0 80 20" style="width:100%;height:20px;display:block;margin-bottom:6px;">
+            <polyline points="0,16 10,14 20,12 30,13 40,9 50,7 60,8 70,5 80,4" fill="none" stroke="#58a6ff" stroke-width="1.2"/>
+          </svg>
+          <div style="font-size:9px;color:#3fb950;">● Open</div>
+        </div>
+        <!-- Card 2 -->
+        <div style="background:#161b22;border:1px solid #30363d;border-radius:6px;padding:10px;cursor:pointer;">
+          <div style="font-size:11px;font-weight:bold;color:#cdd9e5;margin-bottom:2px;">KXECON-UNEMP-JAN</div>
+          <div style="font-size:9px;color:#8b949e;margin-bottom:6px;">economic · 391 snapshots · 3 days</div>
+          <svg viewBox="0 0 80 20" style="width:100%;height:20px;display:block;margin-bottom:6px;">
+            <polyline points="0,10 10,9 20,8 30,6 40,4 50,3 60,2 70,2 80,1" fill="none" stroke="#f85149" stroke-width="1.2"/>
+          </svg>
+          <div style="font-size:9px;color:#f85149;">● Settled YES</div>
+        </div>
+        <!-- Card 3 - sparse data warning -->
+        <div style="background:#161b22;border:1px solid #f0883e;border-radius:6px;padding:10px;cursor:pointer;">
+          <div style="font-size:11px;font-weight:bold;color:#cdd9e5;margin-bottom:2px;">KXWEATHER-NYC-MAR</div>
+          <div style="font-size:9px;color:#8b949e;margin-bottom:6px;">weather · 67 snapshots · 1 day</div>
+          <svg viewBox="0 0 80 20" style="width:100%;height:20px;display:block;margin-bottom:6px;">
+            <polyline points="0,10 20,11 55,9 80,10" fill="none" stroke="#f0883e" stroke-width="1.2" stroke-dasharray="3,3"/>
+          </svg>
+          <div style="font-size:9px;color:#f0883e;">⚠ Sparse data</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Page 2 — Market Detail (<code>/data-explorer/{ticker}</code>)</h3>
+  <div class="mockup">
+    <div class="mockup-header">http://localhost:55055/data-explorer/KXBTC-25DEC-T50000</div>
+    <div class="mockup-body" style="background:#0d1117;padding:16px;font-size:11px;color:#cdd9e5;">
+      <div style="margin-bottom:10px;">
+        <a style="color:#58a6ff;font-size:10px;">← Data Explorer</a>
+        <span style="font-size:14px;font-weight:bold;color:#cdd9e5;margin-left:10px;">KXBTC-25DEC-T50000</span>
+        <span style="font-size:10px;color:#8b949e;margin-left:8px;">Bitcoin above $50k by Dec 25 · financial · 842 snapshots · Mar 7–10</span>
+        <span style="float:right;background:#1a3a1a;color:#3fb950;padding:2px 8px;border-radius:10px;font-size:10px;">● Open</span>
+      </div>
+      <!-- Charts stacked -->
+      <div style="background:#161b22;border:1px solid #30363d;border-radius:4px;padding:8px;margin-bottom:6px;">
+        <div style="font-size:10px;color:#8b949e;margin-bottom:4px;">YES Mid Price (cents)</div>
+        <svg viewBox="0 0 300 40" style="width:100%;height:40px;">
+          <polyline points="0,35 30,30 60,25 90,28 120,20 150,15 180,18 210,12 240,10 270,8 300,6" fill="none" stroke="#58a6ff" stroke-width="1.5"/>
+          <line x1="240" y1="0" x2="240" y2="40" stroke="#3fb950" stroke-width="0.5" stroke-dasharray="2,2"/>
+        </svg>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px;">
+        <div style="background:#161b22;border:1px solid #30363d;border-radius:4px;padding:8px;">
+          <div style="font-size:10px;color:#8b949e;margin-bottom:4px;">Bid/Ask Spread</div>
+          <svg viewBox="0 0 140 30" style="width:100%;height:30px;">
+            <polyline points="0,15 20,12 40,18 60,8 80,20 100,10 120,14 140,12" fill="none" stroke="#d2a8ff" stroke-width="1.5"/>
+          </svg>
+        </div>
+        <div style="background:#161b22;border:1px solid #30363d;border-radius:4px;padding:8px;">
+          <div style="font-size:10px;color:#8b949e;margin-bottom:4px;">Volume / Open Interest</div>
+          <svg viewBox="0 0 140 30" style="width:100%;height:30px;">
+            <rect x="0" y="20" width="12" height="10" fill="#1f6feb" opacity="0.7"/>
+            <rect x="15" y="15" width="12" height="15" fill="#1f6feb" opacity="0.7"/>
+            <rect x="30" y="10" width="12" height="20" fill="#1f6feb" opacity="0.7"/>
+            <rect x="45" y="18" width="12" height="12" fill="#1f6feb" opacity="0.7"/>
+            <rect x="60" y="5" width="12" height="25" fill="#1f6feb" opacity="0.7"/>
+            <rect x="75" y="12" width="12" height="18" fill="#1f6feb" opacity="0.7"/>
+          </svg>
+        </div>
+      </div>
+      <div style="background:#161b22;border:1px solid #30363d;border-radius:4px;padding:8px;">
+        <div style="font-size:10px;color:#8b949e;margin-bottom:4px;">Snapshots per Hour (gaps = collection issues)</div>
+        <svg viewBox="0 0 300 20" style="width:100%;height:20px;">
+          <rect x="0" y="10" width="8" height="10" fill="#3fb950" opacity="0.7"/>
+          <rect x="10" y="8" width="8" height="12" fill="#3fb950" opacity="0.7"/>
+          <rect x="20" y="12" width="8" height="8" fill="#3fb950" opacity="0.7"/>
+          <rect x="30" y="5" width="8" height="15" fill="#3fb950" opacity="0.7"/>
+          <rect x="50" y="10" width="8" height="10" fill="#f0883e" opacity="0.7"/>
+          <rect x="70" y="8" width="8" height="12" fill="#3fb950" opacity="0.7"/>
+          <rect x="80" y="10" width="8" height="10" fill="#3fb950" opacity="0.7"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:16px;">Cards link to detail page on click. Detail page has a back link. Charts use Chart.js loaded from CDN.</p>

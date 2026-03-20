@@ -1,0 +1,40 @@
+<h2>When you drill into a specific market, what do you want to see?</h2>
+<p class="subtitle">Select all that apply</p>
+
+<div class="options" data-multiselect>
+  <div class="option" data-choice="price" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>YES price chart</h3>
+      <p>Mid price over time — the core price signal for directional and arbitrage strategies.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="spread" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Bid/ask spread chart</h3>
+      <p>How wide the spread is over time — key for MarketMaker viability.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="volume" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Volume & open interest</h3>
+      <p>Bar chart of trading activity — useful for spotting thin markets to avoid.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="snapshots" onclick="toggleSelect(this)">
+    <div class="letter">D</div>
+    <div class="content">
+      <h3>Snapshot count timeline</h3>
+      <p>How many data points were collected per hour — reveals collection gaps.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="settlement" onclick="toggleSelect(this)">
+    <div class="letter">E</div>
+    <div class="content">
+      <h3>Settlement outcome</h3>
+      <p>Whether the market resolved YES or NO, marked on the chart.</p>
+    </div>
+  </div>
+</div>

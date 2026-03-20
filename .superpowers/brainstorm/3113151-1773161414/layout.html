@@ -1,0 +1,77 @@
+<h2>Coverage overview layout</h2>
+<p class="subtitle">How should your collected markets be displayed on the explorer landing page?</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="table" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:16px;background:#0d1117;">
+      <div class="mock-nav" style="font-size:11px;margin-bottom:8px;">Data Explorer &nbsp;|&nbsp; Filter by category ▾ &nbsp;|&nbsp; Search tickers...</div>
+      <table style="width:100%;font-size:10px;border-collapse:collapse;color:#cdd9e5;">
+        <tr style="color:#8b949e;border-bottom:1px solid #30363d;"><th style="text-align:left;padding:4px">Ticker</th><th>Category</th><th>Snapshots</th><th>Days</th><th>Status</th></tr>
+        <tr style="border-bottom:1px solid #30363d;"><td style="padding:4px">KXBTC-25DEC</td><td style="text-align:center">financial</td><td style="text-align:center">842</td><td style="text-align:center">4</td><td style="text-align:center;color:#3fb950">●&nbsp;Open</td></tr>
+        <tr style="border-bottom:1px solid #30363d;"><td style="padding:4px">KXECON-UNEMP</td><td style="text-align:center">economic</td><td style="text-align:center">391</td><td style="text-align:center">3</td><td style="text-align:center;color:#f85149">●&nbsp;Settled YES</td></tr>
+        <tr style="border-bottom:1px solid #30363d;"><td style="padding:4px">KXNHL-MAR07</td><td style="text-align:center">sports</td><td style="text-align:center">204</td><td style="text-align:center">1</td><td style="text-align:center;color:#8b949e">●&nbsp;Settled NO</td></tr>
+        <tr><td style="padding:4px">KXWEATHER-NYC</td><td style="text-align:center">weather</td><td style="text-align:center">67</td><td style="text-align:center;color:#f0883e">1 ⚠</td><td style="text-align:center;color:#3fb950">●&nbsp;Open</td></tr>
+      </table>
+    </div>
+    <div class="card-body">
+      <h3>A — Sortable Table</h3>
+      <p>Dense, scannable. Sort by snapshot count, category, or status. Best for comparing many markets at once.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="cards" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:16px;background:#0d1117;">
+      <div class="mock-nav" style="font-size:11px;margin-bottom:8px;">Data Explorer &nbsp;|&nbsp; financial &nbsp; economic &nbsp; sports &nbsp; weather</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+        <div style="background:#161b22;border:1px solid #30363d;border-radius:4px;padding:8px;font-size:10px;color:#cdd9e5;">
+          <div style="font-weight:bold;margin-bottom:2px;">KXBTC-25DEC</div>
+          <div style="color:#8b949e;font-size:9px;margin-bottom:6px;">financial · 842 snapshots</div>
+          <div style="height:24px;background:#1f2937;border-radius:2px;position:relative;overflow:hidden;">
+            <div style="position:absolute;top:0;left:0;right:0;bottom:0;background:linear-gradient(90deg,#1d4ed8,#3b82f6,#60a5fa,#93c5fd);opacity:0.7;"></div>
+          </div>
+          <div style="margin-top:4px;color:#3fb950;font-size:9px;">● Open</div>
+        </div>
+        <div style="background:#161b22;border:1px solid #30363d;border-radius:4px;padding:8px;font-size:10px;color:#cdd9e5;">
+          <div style="font-weight:bold;margin-bottom:2px;">KXECON-UNEMP</div>
+          <div style="color:#8b949e;font-size:9px;margin-bottom:6px;">economic · 391 snapshots</div>
+          <div style="height:24px;background:#1f2937;border-radius:2px;position:relative;overflow:hidden;">
+            <div style="position:absolute;top:0;left:0;right:0;bottom:0;background:linear-gradient(90deg,#7c3aed,#8b5cf6,#a78bfa);opacity:0.7;"></div>
+          </div>
+          <div style="margin-top:4px;color:#f85149;font-size:9px;">● Settled YES</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Card Grid</h3>
+      <p>Visual, grouped by category tabs. Tiny sparkline per market. Better for a quick glance at shape of data.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="split" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:16px;background:#0d1117;">
+      <div style="display:flex;gap:8px;height:100px;">
+        <div style="width:45%;font-size:10px;color:#cdd9e5;">
+          <div style="color:#8b949e;font-size:9px;margin-bottom:4px;text-transform:uppercase;letter-spacing:1px;">Markets (23)</div>
+          <div style="background:#161b22;border:1px solid #3b82f6;border-radius:3px;padding:4px 6px;margin-bottom:3px;font-size:10px;">KXBTC-25DEC <span style="float:right;color:#3fb950">842</span></div>
+          <div style="background:#161b22;border:1px solid #30363d;border-radius:3px;padding:4px 6px;margin-bottom:3px;font-size:10px;color:#8b949e;">KXECON-UNEMP <span style="float:right">391</span></div>
+          <div style="background:#161b22;border:1px solid #30363d;border-radius:3px;padding:4px 6px;font-size:10px;color:#8b949e;">KXNHL-MAR07 <span style="float:right">204</span></div>
+        </div>
+        <div style="flex:1;background:#161b22;border:1px solid #30363d;border-radius:4px;padding:8px;font-size:9px;color:#8b949e;">
+          <div style="color:#cdd9e5;font-weight:bold;font-size:10px;margin-bottom:2px;">KXBTC-25DEC</div>
+          <div style="margin-bottom:6px;">842 snapshots · 4 days · financial</div>
+          <div style="height:36px;background:#0d1117;border-radius:2px;position:relative;">
+            <svg viewBox="0 0 100 36" style="width:100%;height:100%;">
+              <polyline points="0,28 15,24 30,20 45,22 60,15 75,10 90,13 100,9" fill="none" stroke="#3b82f6" stroke-width="1.5"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Master/Detail</h3>
+      <p>Scrollable market list on the left, detail panel on the right. Click a market to preview — full charts open in a detail page.</p>
+    </div>
+  </div>
+
+</div>

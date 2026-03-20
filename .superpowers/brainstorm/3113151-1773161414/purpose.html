@@ -1,0 +1,33 @@
+<h2>What's the primary goal of this dashboard?</h2>
+<p class="subtitle">You've got 4 days of market snapshots. What do you most want to do with them?</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Explore price history</h3>
+      <p>Browse charts of YES/NO price movement for specific markets over time. Useful for spotting patterns before backtesting.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Data coverage / quality check</h3>
+      <p>See which tickers have data, how many snapshots, any gaps in collection. Validate your dataset before trusting backtest results.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Both — a full data explorer</h3>
+      <p>Coverage overview at the top, drill into any market to see its price chart, spread history, and snapshot count.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="d" onclick="toggleSelect(this)">
+    <div class="letter">D</div>
+    <div class="content">
+      <h3>Signal correlation view</h3>
+      <p>Overlay Polymarket correlated prices alongside Kalshi YES prices to see how well they track before using arbitrage strategy.</p>
+    </div>
+  </div>
+</div>
