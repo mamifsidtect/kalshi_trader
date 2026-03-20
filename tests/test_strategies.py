@@ -152,3 +152,21 @@ def test_on_exit_none_entry_ts_skips_time_check():
     result = s.on_exit(entry_price=45, entry_ts=None, direction="yes",
                        market=make_snapshot(), signals=make_signals())
     assert result is False
+
+
+def test_on_exit_time_limit_uses_current_ts():
+    """on_exit should accept optional current_ts for backtesting instead of wall clock."""
+    s = DirectionalStrategy(exit_time_hours=1)
+    snap = make_snapshot()
+    result = s.on_exit(entry_price=45, entry_ts=1000, direction="yes",
+                       market=snap, signals=make_signals(), current_ts=4700)
+    assert result is True
+
+
+def test_on_exit_time_limit_not_hit_with_current_ts():
+    """on_exit with current_ts should not exit if time limit not reached."""
+    s = DirectionalStrategy(exit_time_hours=1)
+    snap = make_snapshot()
+    result = s.on_exit(entry_price=45, entry_ts=1000, direction="yes",
+                       market=snap, signals=make_signals(), current_ts=2000)
+    assert result is False

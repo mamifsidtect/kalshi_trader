@@ -26,20 +26,21 @@ class BaseStrategy(ABC):
         direction: str,
         market: MarketSnapshot,
         signals: ExternalSignals,
+        current_ts: Optional[int] = None,
     ) -> bool:
         """Return True to close this position early. Checks profit target and time limit."""
         if self.exit_profit_cents > 0 and entry_price is not None and market.mid_price is not None:
             if direction == "yes":
                 profit = market.mid_price - entry_price
             elif direction == "no":
-                # entry_price is the NO price paid; current NO mid = 100 - YES_mid
                 profit = (100 - market.mid_price) - entry_price
             else:
                 profit = None
             if profit is not None and profit >= self.exit_profit_cents:
                 return True
         if self.exit_time_hours > 0 and entry_ts is not None:
-            elapsed_hours = (_time.time() - entry_ts) / 3600
+            now = current_ts if current_ts is not None else int(_time.time())
+            elapsed_hours = (now - entry_ts) / 3600
             if elapsed_hours >= self.exit_time_hours:
                 return True
         return False

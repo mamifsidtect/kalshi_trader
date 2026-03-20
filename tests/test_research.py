@@ -89,3 +89,167 @@ def test_backtester_does_not_mix_tickers():
     a_trades = [t for t in result.trade_log if t["ticker"] == "TICKER-A"]
     assert len(a_trades) == 1
     assert a_trades[0]["pnl"] > 0  # bought YES, settled YES → profit
+
+
+def test_backtester_no_position_pnl_correct():
+    """NO position P&L must use (100 - yes_exit) as the NO exit price."""
+    from kalshi_trader.strategies.base_strategy import BaseStrategy
+    from kalshi_trader.data.models import Signal
+    import time
+
+    class AlwaysBuyNo(BaseStrategy):
+        name = "AlwaysBuyNo"
+        def on_market_update(self, market, signals):
+            return Signal(
+                ticker=market.ticker, direction="no", confidence=0.9,
+                size=1, strategy_name=self.name, reason="test",
+                timestamp=int(time.time()),
+            )
+
+    cfg = KalshiConfig()
+    bt = Backtester(cfg)
+    signals_obj = ExternalSignals(timestamp=int(time.time()))
+
+    snaps = [
+        MarketSnapshot(
+            ticker="T", timestamp=1700000000,
+            yes_bid=45, yes_ask=50, no_bid=50, no_ask=55,
+            volume=500, open_interest=200, category="financial",
+        ),
+        MarketSnapshot(
+            ticker="T", timestamp=1700000060,
+            yes_bid=98, yes_ask=99, no_bid=1, no_ask=2,
+            volume=500, open_interest=200, category="financial",
+            settled=True,
+        ),
+    ]
+    result = bt.run(AlwaysBuyNo(), snaps, lambda ts: signals_obj)
+    assert result.total_trades == 1
+    trade = result.trade_log[0]
+    assert trade["direction"] == "no"
+    assert trade["entry_price"] == 56
+    assert abs(trade["pnl"] - (-0.55)) < 0.01
+
+
+def test_backtester_no_position_win_pnl():
+    """NO position that wins (settled=False) must have correct positive P&L."""
+    from kalshi_trader.strategies.base_strategy import BaseStrategy
+    from kalshi_trader.data.models import Signal
+    import time
+
+    class AlwaysBuyNo(BaseStrategy):
+        name = "AlwaysBuyNo"
+        def on_market_update(self, market, signals):
+            return Signal(
+                ticker=market.ticker, direction="no", confidence=0.9,
+                size=1, strategy_name=self.name, reason="test",
+                timestamp=int(time.time()),
+            )
+
+    cfg = KalshiConfig()
+    bt = Backtester(cfg)
+    signals_obj = ExternalSignals(timestamp=int(time.time()))
+
+    snaps = [
+        MarketSnapshot(
+            ticker="T", timestamp=1700000000,
+            yes_bid=45, yes_ask=50, no_bid=50, no_ask=55,
+            volume=500, open_interest=200, category="financial",
+        ),
+        MarketSnapshot(
+            ticker="T", timestamp=1700000060,
+            yes_bid=0, yes_ask=1, no_bid=99, no_ask=100,
+            volume=500, open_interest=200, category="financial",
+            settled=False,
+        ),
+    ]
+    result = bt.run(AlwaysBuyNo(), snaps, lambda ts: signals_obj)
+    assert result.total_trades == 1
+    trade = result.trade_log[0]
+    assert trade["direction"] == "no"
+    assert abs(trade["pnl"] - 0.43) < 0.01
+
+
+def test_backtester_resolves_at_close_time():
+    """Positions must close when close_time passes, using last mid_price to infer outcome."""
+    from kalshi_trader.strategies.base_strategy import BaseStrategy
+    from kalshi_trader.data.models import Signal
+    import time
+
+    class AlwaysBuyYes(BaseStrategy):
+        name = "AlwaysBuyYes"
+        def on_market_update(self, market, signals):
+            return Signal(
+                ticker=market.ticker, direction="yes", confidence=0.9,
+                size=1, strategy_name=self.name, reason="test",
+                timestamp=int(time.time()),
+            )
+
+    cfg = KalshiConfig()
+    bt = Backtester(cfg)
+    signals_obj = ExternalSignals(timestamp=int(time.time()))
+
+    snaps = [
+        MarketSnapshot(
+            ticker="T", timestamp=1700000000,
+            yes_bid=45, yes_ask=50, no_bid=50, no_ask=55,
+            volume=500, open_interest=200, category="financial",
+            close_time="2023-11-14T20:03:20+00:00",
+        ),
+        MarketSnapshot(
+            ticker="T", timestamp=1700000100,
+            yes_bid=78, yes_ask=82, no_bid=18, no_ask=22,
+            volume=500, open_interest=200, category="financial",
+            close_time="2023-11-14T20:03:20+00:00",
+        ),
+        MarketSnapshot(
+            ticker="T", timestamp=1700000300,
+            yes_bid=78, yes_ask=82, no_bid=18, no_ask=22,
+            volume=500, open_interest=200, category="financial",
+            close_time="2023-11-14T20:03:20+00:00",
+        ),
+    ]
+    result = bt.run(AlwaysBuyYes(), snaps, lambda ts: signals_obj)
+    assert result.total_trades == 1
+    trade = result.trade_log[0]
+    assert trade["direction"] == "yes"
+    assert trade["exit_price"] > 50
+
+
+def test_backtester_calls_on_exit():
+    """Backtester must call strategy.on_exit() and close if it returns True."""
+    from kalshi_trader.strategies.base_strategy import BaseStrategy
+    from kalshi_trader.data.models import Signal
+    import time
+
+    class ProfitTaker(BaseStrategy):
+        name = "ProfitTaker"
+        exit_profit_cents = 5
+
+        def on_market_update(self, market, signals):
+            return Signal(
+                ticker=market.ticker, direction="yes", confidence=0.9,
+                size=1, strategy_name=self.name, reason="test",
+                timestamp=int(time.time()),
+            )
+
+    cfg = KalshiConfig()
+    bt = Backtester(cfg)
+    signals_obj = ExternalSignals(timestamp=int(time.time()))
+
+    snaps = [
+        MarketSnapshot(
+            ticker="T", timestamp=1700000000,
+            yes_bid=45, yes_ask=50, no_bid=50, no_ask=55,
+            volume=500, open_interest=200, category="financial",
+        ),
+        MarketSnapshot(
+            ticker="T", timestamp=1700000060,
+            yes_bid=58, yes_ask=62, no_bid=38, no_ask=42,
+            volume=500, open_interest=200, category="financial",
+        ),
+    ]
+    result = bt.run(ProfitTaker(), snaps, lambda ts: signals_obj)
+    assert result.total_trades == 1
+    trade = result.trade_log[0]
+    assert trade["pnl"] > 0

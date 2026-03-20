@@ -53,6 +53,18 @@ class Backtester:
 
         return self._compute_result(strategy.name, all_trades, all_pnl)
 
+    @staticmethod
+    def _parse_close_time(close_time_str: str) -> int:
+        """Parse ISO close_time string to unix timestamp. Returns 0 if unparseable."""
+        if not close_time_str:
+            return 0
+        try:
+            from datetime import datetime, timezone
+            dt = datetime.fromisoformat(close_time_str)
+            return int(dt.timestamp())
+        except (ValueError, TypeError):
+            return 0
+
     def _run_single_ticker(
         self,
         strategy: BaseStrategy,
@@ -66,41 +78,73 @@ class Backtester:
 
         for snap in snapshots:
             signals = signals_fn(snap.timestamp)
-            signal = strategy.on_market_update(snap, signals)
 
-            if open_position is None and signal is not None and snap.mid_price is not None:
-                if signal.direction == "yes" and snap.yes_ask is not None:
-                    entry_price = snap.yes_ask + slippage
-                elif signal.direction == "no" and snap.no_ask is not None:
-                    entry_price = snap.no_ask + slippage
-                else:
+            # --- Try to close open position ---
+            if open_position is not None:
+                closed = False
+
+                # 1. Explicit settlement
+                if snap.settled is not None:
+                    exit_price = 99 if snap.settled else 1
+                    closed = True
+
+                # 2. close_time passed — infer outcome from last mid_price
+                elif snap.close_time:
+                    close_ts = self._parse_close_time(snap.close_time)
+                    if close_ts > 0 and snap.timestamp >= close_ts and snap.mid_price is not None:
+                        exit_price = int(snap.mid_price)
+                        closed = True
+
+                # 3. Strategy early exit (passes current_ts for backtesting)
+                elif snap.mid_price is not None:
+                    if strategy.on_exit(
+                        open_position["entry_price"],
+                        open_position["entry_bar"],
+                        open_position["direction"],
+                        snap,
+                        signals,
+                        current_ts=snap.timestamp,
+                    ):
+                        exit_price = int(snap.mid_price)
+                        closed = True
+
+                if closed:
+                    entry = open_position["entry_price"]
+                    if open_position["direction"] == "yes":
+                        pnl = open_position["size"] * ((exit_price - entry) / 100.0)
+                    else:
+                        no_exit_price = 100 - exit_price
+                        pnl = open_position["size"] * ((no_exit_price - entry) / 100.0)
+
+                    trade_log.append({
+                        "ticker": open_position["ticker"],
+                        "direction": open_position["direction"],
+                        "entry_price": entry,
+                        "exit_price": exit_price,
+                        "pnl": pnl,
+                        "hold_bars": snap.timestamp - open_position["entry_bar"],
+                    })
+                    pnl_series.append(pnl)
+                    open_position = None
                     continue
-                open_position = {
-                    "ticker": snap.ticker,
-                    "direction": signal.direction,
-                    "entry_price": entry_price,
-                    "size": signal.size,
-                    "entry_bar": snap.timestamp,
-                }
 
-            elif open_position is not None and snap.settled is not None:
-                exit_price = 99 if snap.settled else 1
-                entry = open_position["entry_price"]
-                if open_position["direction"] == "yes":
-                    pnl = open_position["size"] * ((exit_price - entry) / 100.0)
-                else:
-                    pnl = open_position["size"] * ((entry - exit_price) / 100.0)
-
-                trade_log.append({
-                    "ticker": open_position["ticker"],
-                    "direction": open_position["direction"],
-                    "entry_price": entry,
-                    "exit_price": exit_price,
-                    "pnl": pnl,
-                    "hold_bars": snap.timestamp - open_position["entry_bar"],
-                })
-                pnl_series.append(pnl)
-                open_position = None
+            # --- Try to open new position ---
+            if open_position is None:
+                signal = strategy.on_market_update(snap, signals)
+                if signal is not None and snap.mid_price is not None:
+                    if signal.direction == "yes" and snap.yes_ask is not None:
+                        entry_price = snap.yes_ask + slippage
+                    elif signal.direction == "no" and snap.no_ask is not None:
+                        entry_price = snap.no_ask + slippage
+                    else:
+                        continue
+                    open_position = {
+                        "ticker": snap.ticker,
+                        "direction": signal.direction,
+                        "entry_price": entry_price,
+                        "size": signal.size,
+                        "entry_bar": snap.timestamp,
+                    }
 
         return trade_log, pnl_series
 
