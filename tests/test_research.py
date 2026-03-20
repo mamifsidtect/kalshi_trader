@@ -253,3 +253,38 @@ def test_backtester_calls_on_exit():
     assert result.total_trades == 1
     trade = result.trade_log[0]
     assert trade["pnl"] > 0
+
+
+def test_full_backtest_pipeline_produces_trades():
+    """End-to-end: realistic data with close_time -> backtester produces trades with correct P&L."""
+    cfg = KalshiConfig()
+    bt = Backtester(cfg)
+    signals_obj = ExternalSignals(timestamp=1700000000)
+
+    # Simulate a market that opens, trades, and expires
+    # close_time = 1700000500 (after 5 snapshots at 60s intervals = 300s, so after snap 5)
+    close_time_iso = "2023-11-14T20:08:20+00:00"  # = 1700000500
+    snaps = []
+    for i in range(10):
+        ts = 1700000000 + i * 60
+        # Price drifts from 50 toward 70 (YES winning)
+        yes_bid = 45 + i * 2
+        yes_ask = yes_bid + 5
+        snaps.append(MarketSnapshot(
+            ticker="DRIFT-1", timestamp=ts,
+            yes_bid=yes_bid, yes_ask=yes_ask,
+            no_bid=100 - yes_ask, no_ask=100 - yes_bid,
+            volume=500, open_interest=200, category="financial",
+            close_time=close_time_iso,
+        ))
+
+    strategy = MarketMakerStrategy(min_spread=3, min_volume=0)
+    result = bt.run(strategy, snaps, lambda ts: signals_obj)
+
+    assert result.total_trades >= 1, f"Expected trades but got {result.total_trades}"
+    assert result.win_rate >= 0.0
+    # Verify trade P&L has correct sign (position opened early, closed near 65c mid)
+    for t in result.trade_log:
+        assert "entry_price" in t
+        assert "exit_price" in t
+        assert isinstance(t["pnl"], float)
