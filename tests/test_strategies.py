@@ -104,6 +104,38 @@ def test_directional_no_signal_below_threshold():
     assert sig is None
 
 
+def test_directional_fires_with_strong_price_signal():
+    """DirectionalStrategy must fire when price signal is strong (mid > 65)."""
+    s = DirectionalStrategy(confidence_threshold=0.6)
+    snap = MarketSnapshot(
+        ticker="T", timestamp=1700000000,
+        yes_bid=70, yes_ask=75, no_bid=25, no_ask=30,
+        volume=100, open_interest=50, category="financial",
+    )
+    # mid_price = 72.5, distance = 22.5, price_score = min(22.5/15, 1)*0.65 = 0.65
+    sig = s.on_market_update(snap, make_signals())
+    assert sig is not None
+    assert sig.direction == "yes"
+
+
+def test_directional_fires_with_signals_and_price():
+    """DirectionalStrategy with news + price should fire."""
+    s = DirectionalStrategy(confidence_threshold=0.6)
+    snap = MarketSnapshot(
+        ticker="T", timestamp=1700000000,
+        yes_bid=25, yes_ask=30, no_bid=70, no_ask=75,
+        volume=100, open_interest=50, category="financial",
+    )
+    signals = ExternalSignals(
+        timestamp=1700000000,
+        news_headlines=[{"headline": "Breaking news"}],
+    )
+    # mid=27.5, distance=22.5, price_score=0.65, + news 0.15 = 0.80
+    sig = s.on_market_update(snap, signals)
+    assert sig is not None
+    assert sig.direction == "no"
+
+
 def test_arbitrage_no_signal_when_no_pairs():
     s = ArbitrageStrategy()
     sig = s.on_market_update(make_snapshot(), make_signals())

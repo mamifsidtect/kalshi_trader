@@ -32,12 +32,18 @@ class DirectionalStrategy(BaseStrategy):
         """
         Combine signal sources into a directional confidence score.
         Returns (confidence, direction, reason).
+
+        Scoring (max achievable = 1.0):
+        - Price conviction (distance from 50): up to 0.65
+        - News headlines present: +0.15
+        - Poll data present: +0.2
+        - Economic releases (uncertainty): -0.1
         """
         score = 0.0
         sources = []
 
         if signals.news_headlines:
-            score += 0.1
+            score += 0.15
             sources.append("news")
 
         if signals.economic_releases:
@@ -45,17 +51,20 @@ class DirectionalStrategy(BaseStrategy):
             sources.append("econ_release_penalty")
 
         if signals.poll_data:
-            score += 0.15
+            score += 0.2
             sources.append("polls")
 
-        direction = "yes"  # default direction when price gives no signal
-        if market.mid_price is not None and market.mid_price > 60:
-            score += 0.2
-            direction = "yes"
-        elif market.mid_price is not None and market.mid_price < 40:
-            score += 0.2
-            direction = "no"
-        # mid_price in [40, 60] or None: no price signal, direction stays "yes"
+        direction = "yes"  # default
+        if market.mid_price is not None:
+            distance = abs(market.mid_price - 50)
+            price_score = min(distance / 15.0, 1.0) * 0.65
+            score += price_score
+            if market.mid_price > 50:
+                direction = "yes"
+            else:
+                direction = "no"
+            if distance > 5:
+                sources.append(f"price_conviction={distance:.0f}")
 
         confidence = max(0.0, min(score, 1.0))
         return confidence, direction, f"sources={sources}"
