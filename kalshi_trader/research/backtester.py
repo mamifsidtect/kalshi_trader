@@ -25,8 +25,9 @@ class BacktestResult:
 class Backtester:
     SLIPPAGE_CENTS = 1  # 1 cent slippage on fills
 
-    def __init__(self, config: KalshiConfig):
+    def __init__(self, config: KalshiConfig, vwap_slippage: bool = False):
         self.config = config
+        self.vwap_slippage = vwap_slippage
         self.logger = get_logger(__name__, config.log_level)
 
     def run(
@@ -52,6 +53,24 @@ class Backtester:
             all_pnl.extend(pnl)
 
         return self._compute_result(strategy.name, all_trades, all_pnl)
+
+    def _estimate_vwap_slippage(self, snap: MarketSnapshot, size: int) -> int:
+        """
+        VWAP-based slippage model.
+
+        Instead of fixed slippage, estimate price impact based on volume.
+        From the research: VWAP captures actual achievable prices by accounting
+        for order book depth. Higher volume = less slippage.
+
+        Returns slippage in cents.
+        """
+        if snap.volume <= 0:
+            return 3  # high slippage for illiquid markets
+        # Impact proportional to trade size relative to market volume
+        impact_ratio = size / max(snap.volume, 1)
+        # Base slippage 0.5c for liquid markets, scales up with impact
+        slippage = 0.5 + impact_ratio * 10.0
+        return max(1, min(int(round(slippage)), 5))
 
     @staticmethod
     def _parse_close_time(close_time_str: str) -> int:
@@ -132,10 +151,14 @@ class Backtester:
             if open_position is None:
                 signal = strategy.on_market_update(snap, signals)
                 if signal is not None and snap.mid_price is not None:
+                    effective_slippage = (
+                        self._estimate_vwap_slippage(snap, signal.size)
+                        if self.vwap_slippage else slippage
+                    )
                     if signal.direction == "yes" and snap.yes_ask is not None:
-                        entry_price = snap.yes_ask + slippage
+                        entry_price = snap.yes_ask + effective_slippage
                     elif signal.direction == "no" and snap.no_ask is not None:
-                        entry_price = snap.no_ask + slippage
+                        entry_price = snap.no_ask + effective_slippage
                     else:
                         continue
                     open_position = {

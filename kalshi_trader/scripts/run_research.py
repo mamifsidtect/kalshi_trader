@@ -12,8 +12,11 @@ from datetime import datetime, timezone, timedelta
 from kalshi_trader.config import load_config
 from kalshi_trader.research.backtester import Backtester
 from kalshi_trader.research.signal_tester import SignalTester
+from kalshi_trader.research.parameter_sweeper import ParameterSweeper
 from kalshi_trader.strategies.market_maker import MarketMakerStrategy
 from kalshi_trader.strategies.directional import DirectionalStrategy
+from kalshi_trader.strategies.single_condition_arb import SingleConditionArbStrategy
+from kalshi_trader.strategies.bregman_divergence import BregmanDivergenceStrategy
 from kalshi_trader.data.market_collector import MarketCollector
 from kalshi_trader.data.models import ExternalSignals
 from kalshi_trader.utils.logger import get_logger
@@ -23,12 +26,20 @@ def main():
     parser = argparse.ArgumentParser(description="Run backtests on collected Kalshi data")
     parser.add_argument(
         "--strategy", default="MarketMaker",
-        choices=["MarketMaker", "Directional"],
+        choices=["MarketMaker", "Directional", "SingleConditionArb", "BregmanDivergence"],
         help="Strategy to backtest"
     )
     parser.add_argument("--days", type=int, default=7, help="Days of history to use")
     parser.add_argument("--backfill", action="store_true",
                         help="Backfill settlement data from Kalshi API before running backtest")
+    parser.add_argument("--sweep", action="store_true",
+                        help="Auto-sweep parameters if default config fails promotion gate")
+    parser.add_argument("--sweep-all", action="store_true",
+                        help="Sweep parameters for all strategies")
+    parser.add_argument("--rank-by", default="sharpe", choices=["sharpe", "win_rate"],
+                        help="Metric to rank sweep results by (default: sharpe)")
+    parser.add_argument("--vwap-slippage", action="store_true",
+                        help="Use VWAP-based slippage model instead of fixed 1c slippage")
     args = parser.parse_args()
 
     cfg = load_config()
@@ -88,15 +99,39 @@ def main():
         blank = ExternalSignals(timestamp=int(time.time()))
         signals_fn = lambda ts: blank
 
-    # Backtest
+    # Sweep all strategies if requested
+    if args.sweep_all:
+        sweeper = ParameterSweeper(cfg)
+        reports = sweeper.sweep_all(snapshots, signals_fn, rank_by=args.rank_by)
+        for name, report in reports.items():
+            _log_sweep_report(logger, name, report)
+        return
+
+    # Backtest with default params
     strategy_map = {
         "MarketMaker": MarketMakerStrategy(min_volume=0),
         "Directional": DirectionalStrategy(),
+        "SingleConditionArb": SingleConditionArbStrategy(),
+        "BregmanDivergence": BregmanDivergenceStrategy(),
     }
     strategy = strategy_map[args.strategy]
-    bt = Backtester(cfg)
+    bt = Backtester(cfg, vwap_slippage=args.vwap_slippage)
     result = bt.run(strategy, snapshots, signals_fn)
 
+    _log_backtest_result(logger, result, cfg)
+
+    # Auto-sweep if default params failed the gate
+    if not result.meets_promotion_gate(cfg) and args.sweep:
+        logger.info(
+            f"\nDefault {args.strategy} params failed promotion gate. "
+            f"Starting automatic parameter sweep..."
+        )
+        sweeper = ParameterSweeper(cfg)
+        report = sweeper.sweep(args.strategy, snapshots, signals_fn, rank_by=args.rank_by)
+        _log_sweep_report(logger, args.strategy, report)
+
+
+def _log_backtest_result(logger, result, cfg):
     logger.info(f"\n--- Backtest Results: {result.strategy_name} ---")
     logger.info(f"  Trades:       {result.total_trades}")
     logger.info(f"  Win Rate:     {result.win_rate:.1%}")
@@ -115,6 +150,36 @@ def main():
             )
     else:
         logger.info("  No trades were generated. Check strategy thresholds and data quality.")
+
+
+def _log_sweep_report(logger, strategy_name, report):
+    promoted = report.promoted_results
+    logger.info(f"\n--- Sweep Report: {strategy_name} ---")
+    logger.info(f"  Combinations tested: {report.total_combinations}")
+    logger.info(f"  Configs passing gate: {len(promoted)}")
+
+    if report.best:
+        b = report.best
+        logger.info(f"  >>> BEST PROMOTABLE CONFIG <<<")
+        for k, v in b.params.items():
+            logger.info(f"      {k}: {v}")
+        logger.info(
+            f"    Sharpe={b.backtest.sharpe:.2f}  Win={b.backtest.win_rate:.1%}  "
+            f"PnL=${b.backtest.total_pnl:.2f}  Trades={b.backtest.total_trades}  "
+            f"MaxDD=${b.backtest.max_drawdown:.2f}"
+        )
+    else:
+        logger.info("  No configuration passed the promotion gate.")
+        top = report.all_results[:5]
+        if top:
+            logger.info("  Top 5 (closest to gate):")
+            for i, r in enumerate(top, 1):
+                logger.info(
+                    f"    #{i} {r.params} — "
+                    f"Sharpe={r.backtest.sharpe:.2f}  "
+                    f"Win={r.backtest.win_rate:.1%}  "
+                    f"Trades={r.backtest.total_trades}"
+                )
 
 
 if __name__ == "__main__":

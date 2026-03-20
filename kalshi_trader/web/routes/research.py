@@ -15,6 +15,8 @@ class BacktestRequest(BaseModel):
     days: int = 7
     min_spread: Optional[int] = 3
     confidence_threshold: Optional[float] = 0.6
+    min_edge_cents: Optional[int] = 5
+    min_divergence: Optional[float] = 0.05
 
 
 @router.get("/research/signals", response_class=HTMLResponse)
@@ -31,6 +33,8 @@ async def backtest_page(request: Request):
 async def run_backtest(req: BacktestRequest, request: Request):
     from kalshi_trader.strategies.market_maker import MarketMakerStrategy
     from kalshi_trader.strategies.directional import DirectionalStrategy
+    from kalshi_trader.strategies.single_condition_arb import SingleConditionArbStrategy
+    from kalshi_trader.strategies.bregman_divergence import BregmanDivergenceStrategy
     from kalshi_trader.research.backtester import Backtester
     from kalshi_trader.data.models import ExternalSignals
 
@@ -38,6 +42,8 @@ async def run_backtest(req: BacktestRequest, request: Request):
     strategy_map = {
         "MarketMaker": MarketMakerStrategy(min_spread=req.min_spread or 3),
         "Directional": DirectionalStrategy(confidence_threshold=req.confidence_threshold or 0.6),
+        "SingleConditionArb": SingleConditionArbStrategy(min_edge_cents=req.min_edge_cents or 5),
+        "BregmanDivergence": BregmanDivergenceStrategy(min_divergence=req.min_divergence or 0.05),
     }
     strategy = strategy_map.get(req.strategy)
     if not strategy:

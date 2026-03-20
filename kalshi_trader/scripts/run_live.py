@@ -16,6 +16,8 @@ from kalshi_trader.data.external_signals import ExternalSignalCollector
 from kalshi_trader.strategies.market_maker import MarketMakerStrategy
 from kalshi_trader.strategies.directional import DirectionalStrategy
 from kalshi_trader.strategies.arbitrage import ArbitrageStrategy
+from kalshi_trader.strategies.single_condition_arb import SingleConditionArbStrategy
+from kalshi_trader.strategies.bregman_divergence import BregmanDivergenceStrategy
 from kalshi_trader.risk.risk_manager import RiskManager
 from kalshi_trader.execution.paper_trader import PaperTrader
 from kalshi_trader.execution.live_trader import LiveTrader
@@ -36,7 +38,13 @@ def trading_loop(cfg, client, risk_manager, executor, logger):
     market_collector = MarketCollector(client, cfg)
     signal_collector = ExternalSignalCollector(cfg)
     arb_strategy = ArbitrageStrategy()
-    strategies = [MarketMakerStrategy(), DirectionalStrategy(), arb_strategy]
+    strategies = [
+        MarketMakerStrategy(),
+        DirectionalStrategy(),
+        arb_strategy,
+        SingleConditionArbStrategy(),
+        BregmanDivergenceStrategy(),
+    ]
     last_reset_date = datetime.now(timezone.utc).date()
     _data_service = DataService(cfg)
 

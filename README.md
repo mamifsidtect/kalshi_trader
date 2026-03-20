@@ -1,6 +1,6 @@
 # Kalshi Prediction Market Trader
 
-A research-first prediction market trading system using the [Kalshi](https://kalshi.com) Python SDK. Supports market making, directional, and arbitrage strategies across all Kalshi market categories (economic, political, sports, weather).
+A research-first prediction market trading system using the [Kalshi](https://kalshi.com) Python SDK. Supports market making, directional, arbitrage, single-condition arbitrage, and Bregman divergence strategies across all Kalshi market categories (economic, political, sports, weather). Includes automatic parameter sweeps, Kelly criterion position sizing, and VWAP-based slippage modeling.
 
 ## Architecture
 
@@ -11,6 +11,8 @@ Two separated layers:
 - Backfill settlement outcomes for already-collected snapshots
 - Test signal predictive accuracy
 - Backtest strategies against historical data with a promotion gate
+- Automatic parameter sweeps when default configs fail promotion
+- VWAP-based slippage modeling for realistic backtest results
 
 **Live Layer** (activated after research validates a strategy)
 - Paper trading (simulated fills) or live order execution
@@ -24,13 +26,13 @@ kalshi_trader/
 ├── client/             # Kalshi SDK wrapper (auth, retries)
 ├── data/               # Market collector, external signals (FRED, news, Polymarket)
 │   └── models.py       # MarketSnapshot, ExternalSignals, Signal dataclasses
-├── research/           # Backtester + signal tester
-├── strategies/         # MarketMaker, Directional, Arbitrage
+├── research/           # Backtester, signal tester, parameter sweeper
+├── strategies/         # MarketMaker, Directional, Arbitrage, SingleConditionArb, BregmanDivergence, KellySizer
 ├── risk/               # Risk manager
 ├── execution/          # PaperTrader + LiveTrader
 ├── web/                # FastAPI dashboard + data explorer
 │   └── services/       # DataService, DataExplorerService
-├── scripts/            # Entry points (collect_data, run_research, run_live)
+├── scripts/            # Entry points (collect_data, run_research, run_live, run_dashboard)
 └── utils/              # Logger
 ```
 
@@ -81,6 +83,19 @@ python -m kalshi_trader.scripts.run_research --strategy MarketMaker --days 7
 
 # Backtest Directional strategy
 python -m kalshi_trader.scripts.run_research --strategy Directional --days 14
+
+# Backtest new formulaic strategies
+python -m kalshi_trader.scripts.run_research --strategy SingleConditionArb --days 14
+python -m kalshi_trader.scripts.run_research --strategy BregmanDivergence --days 14
+
+# Auto-sweep parameters when default config fails the promotion gate
+python -m kalshi_trader.scripts.run_research --strategy Directional --sweep --days 14
+
+# Sweep all strategies at once, rank by win rate
+python -m kalshi_trader.scripts.run_research --sweep-all --rank-by win_rate --days 14
+
+# Use VWAP-based slippage for more realistic backtests
+python -m kalshi_trader.scripts.run_research --strategy SingleConditionArb --vwap-slippage --days 14
 ```
 
 The backtester closes positions via three mechanisms (in priority order):
@@ -110,6 +125,8 @@ EXECUTION_MODE=live python -m kalshi_trader.scripts.run_live
 | `MarketMaker` | Quotes both YES/NO sides, captures bid-ask spread. Uses `effective_no_bid` to handle markets that only report YES prices. |
 | `Directional` | Takes YES/NO based on signal confidence (news, polls, price conviction). Fires when price is far from 50c. |
 | `Arbitrage` | Exploits mispricing between Kalshi markets and correlated Polymarket data |
+| `SingleConditionArb` | Buys the cheaper side when `yes_ask + no_ask < 100` (guaranteed profit on settlement). Based on research showing 41% of prediction market conditions exhibit this mispricing. |
+| `BregmanDivergence` | Uses KL-divergence to measure information-theoretic distance between market-implied probability and fair-value estimates from external signals. Trades toward the Bregman projection when divergence exceeds a threshold. |
 
 ### Strategy Parameters
 
@@ -121,6 +138,48 @@ EXECUTION_MODE=live python -m kalshi_trader.scripts.run_live
 - `confidence_threshold` — minimum score to generate a signal (default: 0.6)
 - Scoring: price conviction (up to 0.65) + news (0.15) + polls (0.20) - economic releases (0.10)
 
+**SingleConditionArb:**
+- `min_edge_cents` — minimum profit edge in cents to trade (default: 5). From the research: edges below 5c get eaten by execution risk.
+- `max_entry_price` — maximum entry price in cents (default: 95). Avoids taking positions near certainty.
+
+**BregmanDivergence:**
+- `min_divergence` — minimum KL-divergence threshold to trade (default: 0.05)
+- Fair value is estimated from a weighted blend: correlated external prices (50%), poll data (25%), news sentiment (15%), market prior (10%)
+
+### Kelly Criterion Position Sizing
+
+A modified Kelly criterion is available for dynamic position sizing (`strategies/kelly_sizer.py`):
+
+```
+f* = (b*p - q) / b * sqrt(p)
+```
+
+Where `b` = edge/cost ratio, `p` = execution probability (adjusted for order book volume), `q` = 1-p. The `sqrt(p)` factor is a conservative half-Kelly variant that accounts for non-atomic fill risk on CLOBs. Sizing is also capped at 25% of order book depth to avoid moving the market.
+
+## Automatic Parameter Sweeps
+
+When a strategy's default parameters fail the promotion gate (Sharpe < 0.5 or win rate < 52%), the parameter sweeper can automatically search for a promotable configuration:
+
+```bash
+# Auto-sweep on failure
+python -m kalshi_trader.scripts.run_research --strategy Directional --sweep
+
+# Sweep all strategies
+python -m kalshi_trader.scripts.run_research --sweep-all --rank-by sharpe
+```
+
+The sweeper tests all combinations from predefined parameter grids:
+
+| Strategy | Parameters Swept |
+|----------|-----------------|
+| `MarketMaker` | min_spread (1-10), min_volume (0-200), exit_profit (0-8c), exit_time (0-12h) |
+| `Directional` | confidence_threshold (0.3-0.8), exit_profit (0-8c), exit_time (0-12h) |
+| `Arbitrage` | min_edge (0.02-0.15), exit_profit (0-8c), exit_time (0-12h) |
+| `SingleConditionArb` | min_edge_cents (2-15), max_entry_price (85-95), exit_profit (0-8c), exit_time (0-12h) |
+| `BregmanDivergence` | min_divergence (0.01-0.20), exit_profit (0-8c), exit_time (0-12h) |
+
+Results are sorted by the chosen metric (sharpe or win_rate). The best promotable config is highlighted; if none pass the gate, the top 5 closest configs are shown.
+
 ## Progression Gates
 
 ```
@@ -129,17 +188,31 @@ Data Collection
 Signal Testing (accuracy > baseline?)
       |
 Backtesting (Sharpe > 0.5, win rate > 52%)
+      |  \--- fails? ---> Automatic Parameter Sweep
+      |                         |
+      |  <--- best config ------/
       |
 Paper Trading (positive P&L over N days)
       |
 Live Trading
 ```
 
-Promotion to live trading is **manual**: set `EXECUTION_MODE=live` in `.env` after reviewing paper results.
+Promotion to live trading is **manual**: set `EXECUTION_MODE=live` in `.env` after reviewing paper results. The parameter sweep step is automatic when using `--sweep`.
 
 ## Web Dashboard
 
-The dashboard runs on port 55055 by default (configurable via `DASHBOARD_PORT` env var).
+The dashboard can be run standalone or as part of the live trading loop:
+
+```bash
+# Standalone — browse data, run backtests, explore signals without trading
+python -m kalshi_trader.scripts.run_dashboard
+python -m kalshi_trader.scripts.run_dashboard --port 8080
+
+# Or as part of live trading (starts automatically)
+python -m kalshi_trader.scripts.run_live
+```
+
+Runs on port 55055 by default (configurable via `DASHBOARD_PORT` env var or `--port`).
 
 | Page | URL | Description |
 |------|-----|-------------|
@@ -215,7 +288,7 @@ Condition IDs can be found in the Polymarket URL or via the Gamma API. Tickers w
 pytest tests/ -v
 ```
 
-101 tests covering the full pipeline: config, data collection, strategies, backtester, risk manager, execution, web dashboard, and data explorer.
+126 tests covering the full pipeline: config, data collection, strategies (including SingleConditionArb, BregmanDivergence, Kelly sizer), backtester (including VWAP slippage), parameter sweeper, risk manager, execution, web dashboard, and data explorer.
 
 ## Disclaimer
 
