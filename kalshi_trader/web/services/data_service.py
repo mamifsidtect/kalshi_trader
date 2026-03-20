@@ -49,13 +49,27 @@ class DataService:
     def get_recent_snapshots(self, days: int = 7) -> List[MarketSnapshot]:
         snapshots = []
         collector = MarketCollector(None, self.config)
-        for i in range(days):
-            date = (datetime.now(timezone.utc) - timedelta(days=i)).strftime("%Y-%m-%d")
-            date_dir = os.path.join(self.config.data_dir, date)
-            if not os.path.exists(date_dir):
-                continue
+        data_dir = self.config.data_dir
+
+        # Collect all available date directories, sorted descending
+        available_dates = []
+        if os.path.exists(data_dir):
+            for entry in os.listdir(data_dir):
+                if os.path.isdir(os.path.join(data_dir, entry)):
+                    available_dates.append(entry)
+        available_dates.sort(reverse=True)
+
+        # Use the most recent N days of actual data (not calendar days)
+        dates_to_load = available_dates[:days]
+
+        for date in dates_to_load:
+            date_dir = os.path.join(data_dir, date)
             for ticker in os.listdir(date_dir):
-                snapshots.extend(collector.load_snapshots(ticker, date))
+                ticker_snaps = collector.load_snapshots(ticker, date)
+                # Filter out snapshots with no usable price data
+                for s in ticker_snaps:
+                    if s.mid_price is not None and s.mid_price > 0:
+                        snapshots.append(s)
         return snapshots
 
     def get_markets(self, category: Optional[str] = None) -> List[Dict]:

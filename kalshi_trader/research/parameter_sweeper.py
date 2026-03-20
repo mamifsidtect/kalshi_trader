@@ -168,9 +168,14 @@ class ParameterSweeper:
                     f"ETA: {eta:.0f}s"
                 )
 
-        # Sort: promoted first, then by rank_by descending
+        # Sort: promoted first, then configs with trades above zero-trade configs,
+        # then by rank_by descending
         report.all_results.sort(
-            key=lambda r: (r.promoted, getattr(r.backtest, rank_by, 0)),
+            key=lambda r: (
+                r.promoted,
+                r.backtest.total_trades > 0,
+                getattr(r.backtest, rank_by, 0),
+            ),
             reverse=True,
         )
 

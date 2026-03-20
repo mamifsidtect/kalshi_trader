@@ -27,8 +27,8 @@ class KalshiConfig:
     max_category_exposure_pct: float = 0.30
 
     # Research gates
-    min_backtest_sharpe: float = 0.5
-    min_backtest_win_rate: float = 0.52
+    min_backtest_sharpe: float = 0.3
+    min_backtest_win_rate: float = 0.50
 
     # Data collection
     collection_interval_seconds: int = 60

@@ -1,3 +1,4 @@
+import hashlib
 import math
 from dataclasses import dataclass, field
 from typing import List, Callable, Dict, Optional
@@ -152,12 +153,18 @@ class Backtester:
                     close_reason = f"settled={'YES' if snap.settled else 'NO'}"
                     closed = True
 
-                # 2. close_time passed — infer outcome from last mid_price
+                # 2. close_time passed — simulate settlement using mid_price as probability
                 elif snap.close_time:
                     close_ts = self._parse_close_time(snap.close_time)
                     if close_ts > 0 and snap.timestamp >= close_ts and snap.mid_price is not None:
-                        exit_price = int(snap.mid_price)
-                        close_reason = "close_time reached"
+                        # Use deterministic pseudo-random based on ticker to simulate
+                        # settlement outcome. mid_price/100 = probability of YES winning.
+                        yes_prob = snap.mid_price / 100.0
+                        seed = hashlib.md5(open_position["ticker"].encode()).hexdigest()
+                        rand_val = int(seed[:8], 16) / 0xFFFFFFFF
+                        settled_yes = rand_val < yes_prob
+                        exit_price = 99 if settled_yes else 1
+                        close_reason = f"simulated settle={'YES' if settled_yes else 'NO'}"
                         closed = True
 
                 # 3. Strategy early exit (passes current_ts for backtesting)
@@ -215,9 +222,16 @@ class Backtester:
                     )
                     if signal.direction == "yes" and snap.yes_ask is not None:
                         entry_price = snap.yes_ask + effective_slippage
-                    elif signal.direction == "no" and snap.no_ask is not None:
-                        entry_price = snap.no_ask + effective_slippage
+                    elif signal.direction == "no":
+                        # Use no_ask if available, fall back to effective_no_ask
+                        no_ask = snap.no_ask if snap.no_ask is not None else snap.effective_no_ask
+                        if no_ask is None:
+                            continue
+                        entry_price = no_ask + effective_slippage
                     else:
+                        continue
+                    # Skip entries with out-of-bounds prices (bad data)
+                    if entry_price <= 1 or entry_price >= 99:
                         continue
                     open_position = {
                         "ticker": snap.ticker,
@@ -233,6 +247,33 @@ class Backtester:
                     )
                 else:
                     signals_skipped += 1
+
+        # Close any remaining open position via simulated settlement
+        if open_position is not None and snapshots:
+            last_snap = snapshots[-1]
+            if last_snap.mid_price is not None:
+                yes_prob = last_snap.mid_price / 100.0
+                seed = hashlib.md5(open_position["ticker"].encode()).hexdigest()
+                rand_val = int(seed[:8], 16) / 0xFFFFFFFF
+                settled_yes = rand_val < yes_prob
+                exit_price = 99 if settled_yes else 1
+                entry = open_position["entry_price"]
+                if open_position["direction"] == "yes":
+                    pnl = open_position["size"] * ((exit_price - entry) / 100.0)
+                else:
+                    no_exit_price = 100 - exit_price
+                    pnl = open_position["size"] * ((no_exit_price - entry) / 100.0)
+                hold_secs = last_snap.timestamp - open_position["entry_bar"]
+                trade_log.append({
+                    "ticker": open_position["ticker"],
+                    "direction": open_position["direction"],
+                    "entry_price": entry,
+                    "exit_price": exit_price,
+                    "pnl": pnl,
+                    "hold_bars": hold_secs,
+                    "close_reason": f"end-of-data settle={'YES' if settled_yes else 'NO'}",
+                })
+                pnl_series.append(pnl)
 
         return trade_log, pnl_series, {"evaluated": signals_evaluated, "skipped": signals_skipped}
 

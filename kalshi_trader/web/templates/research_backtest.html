@@ -154,6 +154,12 @@ document.getElementById('bt-form').addEventListener('submit', async (e) => {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(payload)
     });
+    if (!resp.ok) {
+      const errData = await resp.json().catch(() => ({}));
+      hideProgress();
+      alert('Backtest error: ' + (errData.message || errData.error || `HTTP ${resp.status}`));
+      return;
+    }
     const data = await resp.json();
     showProgress('Rendering results...', 90);
 
@@ -226,6 +232,12 @@ document.getElementById('sweep-btn').addEventListener('click', async () => {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(payload)
     });
+    if (!resp.ok) {
+      const errData = await resp.json().catch(() => ({}));
+      hideProgress();
+      alert('Sweep error: ' + (errData.message || errData.error || `HTTP ${resp.status}`));
+      return;
+    }
     const data = await resp.json();
     showProgress('Rendering sweep results...', 90);
 

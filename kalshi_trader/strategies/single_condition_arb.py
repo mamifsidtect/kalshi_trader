@@ -32,11 +32,14 @@ class SingleConditionArbStrategy(BaseStrategy):
         self.exit_time_hours = exit_time_hours
 
     def on_market_update(self, market: MarketSnapshot, signals: ExternalSignals) -> Optional[Signal]:
-        if market.yes_ask is None or market.no_ask is None:
+        if market.yes_ask is None:
+            return None
+        no_ask = market.no_ask if market.no_ask is not None else market.effective_no_ask
+        if no_ask is None:
             return None
 
         # Cost to buy both sides
-        total_cost = market.yes_ask + market.no_ask
+        total_cost = market.yes_ask + no_ask
         # On settlement, one side pays 100 cents
         edge = 100 - total_cost
 
@@ -44,12 +47,12 @@ class SingleConditionArbStrategy(BaseStrategy):
             return None
 
         # Buy the cheaper side (higher expected value relative to cost)
-        if market.yes_ask <= market.no_ask:
+        if market.yes_ask <= no_ask:
             direction = "yes"
             entry = market.yes_ask
         else:
             direction = "no"
-            entry = market.no_ask
+            entry = no_ask
 
         if entry > self.max_entry_price:
             return None
@@ -62,6 +65,6 @@ class SingleConditionArbStrategy(BaseStrategy):
             confidence=confidence,
             size=self.contracts,
             strategy_name=self.name,
-            reason=f"yes_ask={market.yes_ask}+no_ask={market.no_ask}={total_cost}<100 edge={edge}c",
+            reason=f"yes_ask={market.yes_ask}+no_ask={no_ask}={total_cost}<100 edge={edge}c",
             timestamp=int(time.time()),
         )

@@ -210,10 +210,12 @@ def test_backtester_resolves_at_close_time():
         ),
     ]
     result = bt.run(AlwaysBuyYes(), snaps, lambda ts: signals_obj)
-    assert result.total_trades == 1
+    # Trade 1 closes at close_time via simulated settlement;
+    # Trade 2 opens on the next snapshot and closes via end-of-data settlement.
+    assert result.total_trades == 2
     trade = result.trade_log[0]
     assert trade["direction"] == "yes"
-    assert trade["exit_price"] > 50
+    assert "simulated settle" in trade["close_reason"] or "end-of-data" in trade["close_reason"]
 
 
 def test_backtester_calls_on_exit():

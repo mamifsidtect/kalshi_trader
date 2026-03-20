@@ -7,7 +7,7 @@ import time
 class MarketMakerStrategy(BaseStrategy):
     name = "MarketMaker"
 
-    def __init__(self, min_spread: int = 3, min_volume: int = 100, contracts_per_quote: int = 1,
+    def __init__(self, min_spread: int = 3, min_volume: int = 0, contracts_per_quote: int = 1,
                  exit_profit_cents: int = 0, exit_time_hours: int = 0):
         self.min_spread = min_spread
         self.min_volume = min_volume
