@@ -145,5 +145,6 @@ class KalshiClient:
             "volume": getattr(m, "volume", 0),
             "open_interest": getattr(m, "open_interest", 0),
             "status": getattr(m, "status", ""),
+            "result": getattr(m, "result", None),
             "close_time": _ct.isoformat() if hasattr(_ct, "isoformat") else str(_ct) if _ct else "",
         }

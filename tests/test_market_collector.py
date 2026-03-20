@@ -58,3 +58,44 @@ def test_collector_persists_to_disk(tmp_path):
     collector.collect_once()
     files = list(tmp_path.rglob("*.json"))
     assert len(files) > 0
+
+
+def test_backfill_settlement_updates_snapshots(tmp_path):
+    """backfill_settlement must update stored snapshots with settlement outcomes."""
+    cfg = KalshiConfig()
+    cfg.data_dir = str(tmp_path)
+
+    # Create a stored snapshot without settlement
+    ticker = "TEST-TICKER"
+    date_str = "2026-03-07"
+    ticker_dir = tmp_path / date_str / ticker
+    ticker_dir.mkdir(parents=True)
+    snap_data = {
+        "ticker": ticker, "timestamp": 1709856000,
+        "yes_bid": 45, "yes_ask": 50, "no_bid": 50, "no_ask": 55,
+        "volume": 100, "open_interest": 50, "category": "financial",
+        "title": "Test", "close_time": "", "settled": None,
+    }
+    with open(ticker_dir / "1709856000000000000.json", "w") as f:
+        json.dump(snap_data, f)
+
+    # Mock client that returns settled market
+    class MockClient:
+        def get_markets(self, status=None):
+            if status == "settled":
+                return [{
+                    "ticker": ticker, "result": "yes",
+                    "yes_bid": 99, "yes_ask": 100, "no_bid": 0, "no_ask": 1,
+                    "volume": 200, "open_interest": 0, "category": "financial",
+                    "title": "Test", "close_time": "",
+                }]
+            return []
+
+    collector = MarketCollector(MockClient(), cfg)
+    updated = collector.backfill_settlement(date_str)
+    assert updated >= 1
+
+    # Verify the snapshot was updated
+    with open(ticker_dir / "1709856000000000000.json") as f:
+        data = json.load(f)
+    assert data["settled"] is True

@@ -88,3 +88,50 @@ class MarketCollector:
                 close_time=d.get("close_time", ""), settled=d.get("settled"),
             ))
         return snapshots
+
+    def backfill_settlement(self, date_str: str) -> int:
+        """
+        Fetch settled markets from API and update stored snapshots with settlement outcome.
+        Returns number of snapshots updated.
+        """
+        if self.client is None:
+            return 0
+
+        try:
+            settled_markets = self.client.get_markets(status="settled")
+        except Exception as e:
+            self.logger.error(f"Failed to fetch settled markets: {e}")
+            return 0
+
+        # Build lookup: ticker -> settled outcome
+        outcomes = {}
+        for m in settled_markets:
+            ticker = m.get("ticker") if isinstance(m, dict) else getattr(m, "ticker", None)
+            result = m.get("result") if isinstance(m, dict) else getattr(m, "result", None)
+            if ticker and result:
+                outcomes[ticker] = result == "yes"
+
+        date_dir = os.path.join(self.config.data_dir, date_str)
+        if not os.path.exists(date_dir):
+            return 0
+
+        updated = 0
+        for ticker_name in os.listdir(date_dir):
+            if ticker_name not in outcomes:
+                continue
+            ticker_dir = os.path.join(date_dir, ticker_name)
+            for fname in os.listdir(ticker_dir):
+                if not fname.endswith(".json"):
+                    continue
+                fpath = os.path.join(ticker_dir, fname)
+                with open(fpath) as f:
+                    data = json.load(f)
+                if data.get("settled") is not None:
+                    continue  # already has settlement data
+                data["settled"] = outcomes[ticker_name]
+                with open(fpath, "w") as f:
+                    json.dump(data, f)
+                updated += 1
+
+        self.logger.info(f"Backfilled {updated} snapshots for {date_str}")
+        return updated
