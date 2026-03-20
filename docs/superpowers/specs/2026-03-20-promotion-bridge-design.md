@@ -67,19 +67,13 @@ This covers both `sweep()` and `sweep_all()` (which calls `sweep()` per strategy
 
 ### 3. Web Dashboard Integration — `kalshi_trader/web/routes/research.py`
 
-In the `run_sweep` endpoint, after the sweep completes and `report.best` exists:
+Since `sweeper.sweep()` now calls `save_promoted_config()` internally (Section 2), the web endpoint does not need a separate save call. It only adds a `"promoted"` boolean to the response payload so the frontend knows a config was auto-saved:
 
 ```python
-from kalshi_trader.research.promoter import save_promoted_config
-
-# ... existing sweep logic ...
-promoted = False
-if report.best:
-    save_promoted_config(cfg, req.strategy, report.best.params, report.best.backtest)
-    promoted = True
+promoted = True if report.best else False
 ```
 
-Add `"promoted": promoted` to the response payload so the frontend knows a config was auto-saved.
+Add `"promoted": promoted` to the return dict.
 
 No changes to the backtest endpoint — only sweeps auto-promote.
 
