@@ -132,6 +132,7 @@ def run_sweep(req: SweepRequest, request: Request):
             })
 
         best = None
+        promoted = False
         if report.best:
             best = {
                 "params": report.best.params,
@@ -143,6 +144,7 @@ def run_sweep(req: SweepRequest, request: Request):
                     "max_drawdown": report.best.backtest.max_drawdown,
                 },
             }
+            promoted = True
 
         return {
             "strategy": req.strategy,
@@ -150,6 +152,7 @@ def run_sweep(req: SweepRequest, request: Request):
             "promoted_count": len(report.promoted_results),
             "best": best,
             "top_results": top_results,
+            "promoted": promoted,
         }
     except Exception as e:
         _log.exception("Sweep endpoint failed")
