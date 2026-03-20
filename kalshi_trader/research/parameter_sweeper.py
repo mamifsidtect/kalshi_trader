@@ -20,6 +20,7 @@ from kalshi_trader.strategies.arbitrage import ArbitrageStrategy
 from kalshi_trader.strategies.single_condition_arb import SingleConditionArbStrategy
 from kalshi_trader.strategies.bregman_divergence import BregmanDivergenceStrategy
 from kalshi_trader.utils.logger import get_logger
+from kalshi_trader.research.promoter import save_promoted_config
 
 
 @dataclass
@@ -181,6 +182,9 @@ class ParameterSweeper:
 
         if report.all_results and report.all_results[0].promoted:
             report.best = report.all_results[0]
+
+        if report.best:
+            save_promoted_config(self.config, strategy_name, report.best.params, report.best.backtest)
 
         self._log_summary(report, rank_by)
         return report

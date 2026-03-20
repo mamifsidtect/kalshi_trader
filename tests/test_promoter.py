@@ -100,3 +100,35 @@ def test_load_promoted_configs_skips_malformed(caplog):
         assert "MarketMaker" in promoted
         assert "Bad" not in promoted
         assert any("malformed" in r.message.lower() for r in caplog.records)
+
+
+def test_sweeper_auto_promotes_best_config():
+    """ParameterSweeper.sweep() should auto-save promoted config when best exists."""
+    from kalshi_trader.research.promoter import load_promoted_configs
+    from kalshi_trader.research.parameter_sweeper import ParameterSweeper
+    from kalshi_trader.data.models import MarketSnapshot, ExternalSignals
+    import time
+
+    with tempfile.TemporaryDirectory() as tmp:
+        cfg = _make_config(tmp)
+        # Use a tiny grid that will produce at least one promoted result
+        # MarketMaker with low min_spread on high-spread data should trade and pass gate
+        snaps = []
+        for i in range(20):
+            snaps.append(MarketSnapshot(
+                ticker="T", timestamp=1700000000 + i * 60,
+                yes_bid=40, yes_ask=50, no_bid=50, no_ask=60,
+                volume=500, open_interest=200, category="financial",
+                settled=True if i == 19 else None,
+            ))
+        signals_obj = ExternalSignals(timestamp=int(time.time()))
+        sweeper = ParameterSweeper(cfg)
+        report = sweeper.sweep(
+            "MarketMaker", snaps, lambda ts: signals_obj,
+            param_grid={"min_spread": [1], "min_volume": [0], "contracts_per_quote": [1],
+                        "exit_profit_cents": [0], "exit_time_hours": [0]},
+        )
+        # If the sweep found a promotable config, it should be saved
+        if report.best:
+            promoted = load_promoted_configs(cfg)
+            assert "MarketMaker" in promoted
