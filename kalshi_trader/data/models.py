@@ -29,6 +29,22 @@ class MarketSnapshot:
             return self.yes_ask - self.yes_bid
         return None
 
+    @property
+    def effective_no_bid(self) -> Optional[int]:
+        if self.no_bid is not None:
+            return self.no_bid
+        if self.yes_ask is not None:
+            return 100 - self.yes_ask
+        return None
+
+    @property
+    def effective_no_ask(self) -> Optional[int]:
+        if self.no_ask is not None:
+            return self.no_ask
+        if self.yes_bid is not None:
+            return 100 - self.yes_bid
+        return None
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "ticker": self.ticker, "timestamp": self.timestamp,

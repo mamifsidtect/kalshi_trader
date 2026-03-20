@@ -154,6 +154,17 @@ def test_on_exit_none_entry_ts_skips_time_check():
     assert result is False
 
 
+def test_snapshot_computes_no_prices_from_yes():
+    """no_bid/no_ask should be computed from yes prices when stored as None."""
+    snap = MarketSnapshot(
+        ticker="T", timestamp=1700000000,
+        yes_bid=40, yes_ask=45, no_bid=None, no_ask=None,
+        volume=100, open_interest=50, category="financial",
+    )
+    assert snap.effective_no_bid == 55
+    assert snap.effective_no_ask == 60
+
+
 def test_on_exit_time_limit_uses_current_ts():
     """on_exit should accept optional current_ts for backtesting instead of wall clock."""
     s = DirectionalStrategy(exit_time_hours=1)
