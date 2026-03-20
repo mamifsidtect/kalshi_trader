@@ -56,15 +56,26 @@ def main():
     logger.info(f"Price momentum accuracy: {momentum_acc:.1%}")
     logger.info(f"Spread stats: {spread_stats}")
 
+    # Load external signals (use cache if available)
+    from kalshi_trader.data.external_signals import ExternalSignalCollector
+    sig_collector = ExternalSignalCollector(cfg)
+    cached_signals = sig_collector.load_cached()
+    if cached_signals:
+        logger.info("Using cached external signals")
+        signals_fn = lambda ts: cached_signals
+    else:
+        logger.info("No cached signals; using blank signals")
+        blank = ExternalSignals(timestamp=int(time.time()))
+        signals_fn = lambda ts: blank
+
     # Backtest
     strategy_map = {
-        "MarketMaker": MarketMakerStrategy(),
+        "MarketMaker": MarketMakerStrategy(min_volume=0),
         "Directional": DirectionalStrategy(),
     }
     strategy = strategy_map[args.strategy]
     bt = Backtester(cfg)
-    blank = ExternalSignals(timestamp=int(time.time()))
-    result = bt.run(strategy, snapshots, lambda ts: blank)
+    result = bt.run(strategy, snapshots, signals_fn)
 
     logger.info(f"\n--- Backtest Results: {result.strategy_name} ---")
     logger.info(f"  Trades:       {result.total_trades}")
@@ -73,6 +84,17 @@ def main():
     logger.info(f"  Sharpe:       {result.sharpe:.2f}")
     logger.info(f"  Max Drawdown: ${result.max_drawdown:.2f}")
     logger.info(f"  Gate Passed:  {result.meets_promotion_gate(cfg)}")
+
+    if result.trade_log:
+        logger.info(f"\n  Sample trades (first 10):")
+        for t in result.trade_log[:10]:
+            logger.info(
+                f"    {t['ticker']} {t['direction']} "
+                f"entry={t['entry_price']}c exit={t['exit_price']}c "
+                f"pnl=${t['pnl']:.2f}"
+            )
+    else:
+        logger.info("  No trades were generated. Check strategy thresholds and data quality.")
 
 
 if __name__ == "__main__":
