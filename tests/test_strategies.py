@@ -71,6 +71,32 @@ def test_market_maker_signals_on_wide_spread():
     assert sig.direction in ("yes", "no")
 
 
+def test_market_maker_uses_effective_no_bid():
+    """MarketMaker must use effective_no_bid when no_bid is None."""
+    s = MarketMakerStrategy(min_spread=3, min_volume=0)
+    snap = MarketSnapshot(
+        ticker="T", timestamp=1700000000,
+        yes_bid=30, yes_ask=35, no_bid=None, no_ask=None,
+        volume=50, open_interest=50, category="financial",
+    )
+    # effective_no_bid = 100-35 = 65, yes_bid=30 < 65 → direction="yes"
+    sig = s.on_market_update(snap, make_signals())
+    assert sig is not None
+    assert sig.direction == "yes"
+
+
+def test_market_maker_no_volume_filter_default():
+    """MarketMaker with min_volume=0 should signal on zero-volume markets."""
+    s = MarketMakerStrategy(min_spread=3, min_volume=0)
+    snap = MarketSnapshot(
+        ticker="T", timestamp=1700000000,
+        yes_bid=30, yes_ask=38, no_bid=62, no_ask=70,
+        volume=0, open_interest=0, category="financial",
+    )
+    sig = s.on_market_update(snap, make_signals())
+    assert sig is not None
+
+
 def test_directional_no_signal_below_threshold():
     s = DirectionalStrategy(confidence_threshold=0.7)
     sig = s.on_market_update(make_snapshot(), make_signals())

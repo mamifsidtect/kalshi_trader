@@ -20,9 +20,9 @@ class MarketMakerStrategy(BaseStrategy):
             return None
         if market.volume < self.min_volume:
             return None
-        # When yes_bid < no_bid, YES side is cheaper — quote it to capture the spread.
-        # When equal or no_bid < yes_bid, default to quoting NO side.
-        if market.yes_bid is not None and market.no_bid is not None and market.yes_bid < market.no_bid:
+        yes_bid = market.yes_bid
+        no_bid = market.effective_no_bid
+        if yes_bid is not None and no_bid is not None and yes_bid < no_bid:
             direction = "yes"
         else:
             direction = "no"
