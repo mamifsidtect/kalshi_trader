@@ -27,6 +27,8 @@ def main():
         help="Strategy to backtest"
     )
     parser.add_argument("--days", type=int, default=7, help="Days of history to use")
+    parser.add_argument("--backfill", action="store_true",
+                        help="Backfill settlement data from Kalshi API before running backtest")
     args = parser.parse_args()
 
     cfg = load_config()
@@ -48,6 +50,24 @@ def main():
         return
 
     logger.info(f"Loaded {len(snapshots)} snapshots across {args.days} days")
+
+    if args.backfill:
+        from kalshi_trader.client.kalshi_client import KalshiClient
+        client = KalshiClient(cfg)
+        for i in range(args.days):
+            date = (datetime.now(timezone.utc) - timedelta(days=i)).strftime("%Y-%m-%d")
+            backfill_collector = MarketCollector(client, cfg)
+            backfill_collector.backfill_settlement(date)
+        # Reload snapshots after backfill
+        snapshots = []
+        for i in range(args.days):
+            date = (datetime.now(timezone.utc) - timedelta(days=i)).strftime("%Y-%m-%d")
+            date_dir = os.path.join(cfg.data_dir, date)
+            if not os.path.exists(date_dir):
+                continue
+            for ticker in os.listdir(date_dir):
+                snapshots.extend(collector.load_snapshots(ticker, date))
+        logger.info(f"After backfill: {len(snapshots)} snapshots")
 
     # Signal tests
     tester = SignalTester(cfg)
